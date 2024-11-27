@@ -72,18 +72,33 @@ def is_contained(ls1: list, ls2: list) -> tuple:
     :param ls1: The narrowed down list.
     :param ls2: The extended list.
     """
+
+    def preprocess_string(s):
+        # Convert to lowercase for case-insensitive comparison
+        return re.sub(r'[^\w\s]', '', s.lower()) # To remove commas from items
+
     match_results = []
-    not_in_ls2 = [] # The ingr the model missed.
+    not_in_ls2 = []  # The ingredients the model missed.
+
+    # Preprocess and tokenize ls2 items
+    ls2_tokenized = [preprocess_string(item).split() for item in ls2]
 
     for item1 in ls1:
-        # Check if item1 is partially contained in any item of list2
-        match_found = any(item1.lower() in item2.lower() for item2 in ls2)
+        # Preprocess and tokenize item1
+        item1_tokens = preprocess_string(item1).split()
+
+        # Check if any token in item1_tokens is present in any tokenized item from ls2
+        match_found = any(any(token in item2 for token in item1_tokens) for item2 in ls2_tokenized)
         match_results.append((item1, match_found))
-        # If no match found, add to not_in_list2
+
+        # If no match found, add to not_in_ls2
         if not match_found:
             not_in_ls2.append(item1)
 
-    matched_items = [item1 for item1, match in match_results if match] # The ingr the model predicted correctly.
+    matched_items = [item1 for item1, match in match_results if match]
+
+    print(f"The matching items are: {matched_items}.")
+    print(f"The missing items are: {not_in_ls2}.")
     return matched_items, not_in_ls2
 
 def calculate_iis(ingr_actual: list, ingr_predicted: list) -> float:
@@ -93,16 +108,18 @@ def calculate_iis(ingr_actual: list, ingr_predicted: list) -> float:
     :param ingr_predicted: All the ingredients the model identified.
     :return: IIS
     """
+    print(f"Calculating IIS...")
     shared_ingr, missed_ingr = is_contained(ingr_actual, ingr_predicted)
     tp = len(shared_ingr) # How many ingr overlap
     fn = len(missed_ingr) # How many ingr in actual and not in predicted
     fp = abs(len(ingr_predicted) - len(ingr_actual)) # How many ingredients appear in predicted but not in actual?
     precision = tp/(tp+fp)
     recall = tp/(tp+fn)
-    iis = (2 * precision * recall)/(precision + recall) # Ingredients Identification Score
+    iis = float("{:.2f}".format((2 * precision * recall)/(precision + recall))) # Ingredients Identification Score
+    print(f"IIS is: {iis}")
     return iis
 
-def calc_actual_and_predicted_ingredients(actual_path: str, predicted_path: str, ingredients_path: str, dish_id: str):
+def calc_actual_and_predicted_ingredients(actual_path: str, predicted_path: str, ingredients_path: str, dish_id: str) -> tuple:
     """
     This function calculates the actual ingredients as they are listed in Nutrition5k dataset.
     Also, the function calculates the predicted ingredients from the responses of the model.
@@ -112,6 +129,7 @@ def calc_actual_and_predicted_ingredients(actual_path: str, predicted_path: str,
     :param dish_id: Dish id as it described in Nutrition5k dataset.
     :return: A tuple contains two lists, one contains the actual ingr and the other the ingr the model predicted.
     """
+    print(f"Calculating ingredients for dish: {dish_id}...")
     actual_df = pd.read_csv(actual_path, header=None)
     predicted_df = pd.read_csv(predicted_path)
     ingredients_df = pd.read_csv(ingredients_path)
@@ -132,15 +150,34 @@ def calc_actual_and_predicted_ingredients(actual_path: str, predicted_path: str,
                 actual_ingredients.append(row[i+1].values[0])
     print(f"The actual ingredients are: {actual_ingredients}, total: {len(actual_ingredients)}")
 
+    for ingredient in actual_ingredients: # Remove ingredients that were defined as sauces
+        if is_sauce(ingredients_path, ingredient):
+            print(f"Removed {ingredient} because it is a sauce.")
+            actual_ingredients.remove(ingredient)
+
+
     return actual_ingredients, ls_predicted_ingredients
 
+def is_sauce(ingredients_filepath: str, ingredient: str) -> bool:
+    """
+    This function checks whether an ingredient was defined as a sauce.
+    :param ingredients_filepath: A path to the ingredients metadata of Nutrition5k.
+    :param ingredient: Input ingredient.
+    :return: True if the ingredient is a sauce and False otherwise.
+    """
+    ingredients_data = pd.read_csv(ingredients_filepath)
+    sauces = ingredients_data[ingredients_data['IsSauce'] == 'Yes']['ingr'].tolist()
+    if ingredient in sauces: return True
+    else: return False
 
 if __name__ == '__main__':
-    actual = r"C:\Users\rotem.geva\OneDrive - Afeka College Of Engineering\Final Project\Nutrition5k dataset\nutrition5k_dataset_metadata_dish_metadata_cafe1.csv"
-    predicted = r"C:\Users\rotem.geva\OneDrive - Afeka College Of Engineering\Final Project\Nutrition5k dataset\Scripts\ClaudeResults.csv"
-    ingredients = r"C:\Users\rotem.geva\OneDrive - Afeka College Of Engineering\Final Project\Nutrition5k dataset\nutrition5k_dataset_metadata_ingredients_metadata.csv"
-    compare_predicted_to_actual(actual, predicted, ingredients, "dish_1558031019")
+    actual = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\פרויקט גמר\Nutrition5k dataset\nutrition5k_dataset_metadata_dish_metadata_cafe1.csv"
+    predicted = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Nutrition5k dataset\Scripts\ClaudeResults.csv"
+    ingredients = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Nutrition5k dataset\nutrition5k_dataset_metadata_ingredients_metadata.csv"
+    actual_ingr, predicted_ingr = calc_actual_and_predicted_ingredients(actual, predicted, ingredients, "dish_1560454562")
+    iis = calculate_iis(actual_ingr, predicted_ingr)
 
 # extract_num_of_ingredients_without_sauce_dishes(path_ingr=r"C:\Users\rotem.geva\OneDrive - Afeka College Of Engineering\פרויקט גמר\Nutrition5k dataset\nutrition5k_dataset_metadata_ingredients_metadata.csv",
 #                                                 path_dish_metadata=r"C:\Users\rotem.geva\OneDrive - Afeka College Of Engineering\פרויקט גמר\Nutrition5k dataset\nutrition5k_dataset_metadata_dish_metadata_cafe1.csv")
+
 
