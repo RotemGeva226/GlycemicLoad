@@ -1,3 +1,5 @@
+import sys
+
 import pandas as pd
 import re
 
@@ -79,6 +81,7 @@ def is_contained(ls1: list, ls2: list) -> tuple:
 
     match_results = []
     not_in_ls2 = []  # The ingredients the model missed.
+    not_in_ls1 = []  # The ingredients that are in ls2 but not in ls1.
 
     # Preprocess and tokenize ls2 items
     ls2_tokenized = [preprocess_string(item).split() for item in ls2]
@@ -97,27 +100,42 @@ def is_contained(ls1: list, ls2: list) -> tuple:
 
     matched_items = [item1 for item1, match in match_results if match]
 
-    print(f"The matching items are: {matched_items}.")
-    print(f"The missing items are: {not_in_ls2}.")
-    return matched_items, not_in_ls2
+    ls1_tokenized = [preprocess_string(item).split() for item in ls1]
+    for item2 in ls2:
+        item2_tokens = preprocess_string(item2).split()
+        match_found = any(any(token in item1 for token in item2_tokens) for item1 in ls1_tokenized)
+        if not match_found:
+            not_in_ls1.append(item2)
 
-def calculate_iis(ingr_actual: list, ingr_predicted: list) -> float:
+    print(f"The matching items are: {matched_items}.")
+    print(f"The extra items are: {not_in_ls2}.")
+    print(f"The missing items are: {not_in_ls1} ")
+    return matched_items, not_in_ls2, not_in_ls1
+
+def calculate_iis(ingr_actual: list = None, ingr_predicted: list = None, mode: str='manual') -> None:
     """
     This function calculates Ingredients Identification Score (IIS), similar to F1 score.
+    :param mode: Automatic uses lists, while manual uses manually inserted tp, fn and fp.
     :param ingr_actual: All the ingredients the model should identify.
     :param ingr_predicted: All the ingredients the model identified.
     :return: IIS
     """
-    print(f"Calculating IIS...")
-    shared_ingr, missed_ingr = is_contained(ingr_actual, ingr_predicted)
-    tp = len(shared_ingr) # How many ingr overlap
-    fn = len(missed_ingr) # How many ingr in actual and not in predicted
-    fp = abs(len(ingr_predicted) - len(ingr_actual)) # How many ingredients appear in predicted but not in actual?
+    print(f"Calculating IIS using mode: {mode}...")
+    match mode:
+        case 'automatic':
+            shared_ingr, extra_ingr, missing_ingr = is_contained(ingr_predicted, ingr_actual)
+            tp = len(shared_ingr)  # How many ingr overlap
+            fn = len(missing_ingr)  # How many ingr in actual and not in predicted
+            fp = len(extra_ingr)  # How many ingredients appear in predicted but not in actual?
+        case 'manual':
+            tp = int(input("Enter TP (num of matching items)."))
+            fn = int(input("Enter FN (items found in actual and not in predicted)."))
+            fp = int(input("Enter FP (items in predicted that not in actual)."))
     precision = tp/(tp+fp)
     recall = tp/(tp+fn)
     iis = float("{:.2f}".format((2 * precision * recall)/(precision + recall))) # Ingredients Identification Score
     print(f"IIS is: {iis}")
-    return iis
+
 
 def calc_actual_and_predicted_ingredients(actual_path: str, predicted_path: str, ingredients_path: str, dish_id: str) -> tuple:
     """
@@ -171,11 +189,17 @@ def is_sauce(ingredients_filepath: str, ingredient: str) -> bool:
     else: return False
 
 if __name__ == '__main__':
-    actual = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\פרויקט גמר\Nutrition5k dataset\nutrition5k_dataset_metadata_dish_metadata_cafe1.csv"
+    actual = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Nutrition5k dataset\nutrition5k_dataset_metadata_dish_metadata_cafe1.csv"
     predicted = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Nutrition5k dataset\Scripts\ClaudeResults.csv"
     ingredients = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Nutrition5k dataset\nutrition5k_dataset_metadata_ingredients_metadata.csv"
-    actual_ingr, predicted_ingr = calc_actual_and_predicted_ingredients(actual, predicted, ingredients, "dish_1560454562")
-    iis = calculate_iis(actual_ingr, predicted_ingr)
+    actual_ingr, predicted_ingr = calc_actual_and_predicted_ingredients(actual, predicted, ingredients, "dish_1557863170")
+    calculate_iis(actual_ingr, predicted_ingr, mode='automatic')
+    answer_quality = input("Is the calculation ok?")
+    match answer_quality:
+        case 'y':
+            sys.exit()
+        case 'n':
+            calculate_iis()
 
 # extract_num_of_ingredients_without_sauce_dishes(path_ingr=r"C:\Users\rotem.geva\OneDrive - Afeka College Of Engineering\פרויקט גמר\Nutrition5k dataset\nutrition5k_dataset_metadata_ingredients_metadata.csv",
 #                                                 path_dish_metadata=r"C:\Users\rotem.geva\OneDrive - Afeka College Of Engineering\פרויקט גמר\Nutrition5k dataset\nutrition5k_dataset_metadata_dish_metadata_cafe1.csv")
