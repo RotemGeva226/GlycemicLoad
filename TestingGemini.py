@@ -7,7 +7,7 @@ from pathlib import Path
 import google.generativeai as genai
 
 
-os.environ["GOOGLE_API_KEY"] = "AIzaSyA5-advzvnh-ovkPay9kTLWj1E1Er7n_yw"
+os.environ["GOOGLE_API_KEY"] = ""
 
 api_key = os.getenv('GOOGLE_API_KEY')
 
