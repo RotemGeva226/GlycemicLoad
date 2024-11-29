@@ -1,5 +1,4 @@
 import sys
-
 import pandas as pd
 import re
 
@@ -112,7 +111,7 @@ def is_contained(ls1: list, ls2: list) -> tuple:
     print(f"The missing items are: {not_in_ls1} ")
     return matched_items, not_in_ls2, not_in_ls1
 
-def calculate_iis(ingr_actual: list = None, ingr_predicted: list = None, mode: str='manual') -> None:
+def calculate_iis(ingr_actual: list = None, ingr_predicted: list = None, mode: str='manual') -> float:
     """
     This function calculates Ingredients Identification Score (IIS), similar to F1 score.
     :param mode: Automatic uses lists, while manual uses manually inserted tp, fn and fp.
@@ -120,6 +119,7 @@ def calculate_iis(ingr_actual: list = None, ingr_predicted: list = None, mode: s
     :param ingr_predicted: All the ingredients the model identified.
     :return: IIS
     """
+    global tp, fp, fn
     print(f"Calculating IIS using mode: {mode}...")
     match mode:
         case 'automatic':
@@ -131,11 +131,13 @@ def calculate_iis(ingr_actual: list = None, ingr_predicted: list = None, mode: s
             tp = int(input("Enter TP (num of matching items)."))
             fn = int(input("Enter FN (items found in actual and not in predicted)."))
             fp = int(input("Enter FP (items in predicted that not in actual)."))
+    if tp == 0:
+        return 0
     precision = tp/(tp+fp)
     recall = tp/(tp+fn)
     iis = float("{:.2f}".format((2 * precision * recall)/(precision + recall))) # Ingredients Identification Score
     print(f"IIS is: {iis}")
-
+    return iis
 
 def calc_actual_and_predicted_ingredients(actual_path: str, predicted_path: str, ingredients_path: str, dish_id: str) -> tuple:
     """
@@ -173,7 +175,6 @@ def calc_actual_and_predicted_ingredients(actual_path: str, predicted_path: str,
             print(f"Removed {ingredient} because it is a sauce.")
             actual_ingredients.remove(ingredient)
 
-
     return actual_ingredients, ls_predicted_ingredients
 
 def is_sauce(ingredients_filepath: str, ingredient: str) -> bool:
@@ -188,18 +189,28 @@ def is_sauce(ingredients_filepath: str, ingredient: str) -> bool:
     if ingredient in sauces: return True
     else: return False
 
+def export_results(filename: str, actual_path: str, predicted_path: str, ingredients_path: str):
+    results_df = pd.read_csv(predicted_path)
+    output_df = results_df
+    for dish in results_df['Dish ID'].values.tolist():
+        actual_ingr, predicted_ingr = calc_actual_and_predicted_ingredients(actual_path, predicted_path, ingredients_path, dish)
+        iis = calculate_iis(actual_ingr, predicted_ingr, mode='automatic')
+        output_df.loc[output_df['Dish ID'] == dish, 'IIS'] = iis
+    output_df.to_csv(filename+".csv", index=False)
+
 if __name__ == '__main__':
     actual = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Nutrition5k dataset\nutrition5k_dataset_metadata_dish_metadata_cafe1.csv"
-    predicted = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Nutrition5k dataset\Scripts\ClaudeResults.csv"
+    predicted = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Classification\Classification Results\ClaudeResults.csv"
     ingredients = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Nutrition5k dataset\nutrition5k_dataset_metadata_ingredients_metadata.csv"
-    actual_ingr, predicted_ingr = calc_actual_and_predicted_ingredients(actual, predicted, ingredients, "dish_1557863170")
-    calculate_iis(actual_ingr, predicted_ingr, mode='automatic')
-    answer_quality = input("Is the calculation ok?")
-    match answer_quality:
-        case 'y':
-            sys.exit()
-        case 'n':
-            calculate_iis()
+    export_results('ClaudeResultsWithIIS', actual, predicted, ingredients)
+    # actual_ingr, predicted_ingr = calc_actual_and_predicted_ingredients(actual, predicted, ingredients, "dish_1558116001")
+    # calculate_iis(actual_ingr, predicted_ingr, mode='automatic')
+    # answer_quality = input("Is the calculation ok?")
+    # match answer_quality:
+    #     case 'y':
+    #         sys.exit()
+    #     case 'n':
+    #         calculate_iis()
 
 # extract_num_of_ingredients_without_sauce_dishes(path_ingr=r"C:\Users\rotem.geva\OneDrive - Afeka College Of Engineering\פרויקט גמר\Nutrition5k dataset\nutrition5k_dataset_metadata_ingredients_metadata.csv",
 #                                                 path_dish_metadata=r"C:\Users\rotem.geva\OneDrive - Afeka College Of Engineering\פרויקט גמר\Nutrition5k dataset\nutrition5k_dataset_metadata_dish_metadata_cafe1.csv")
