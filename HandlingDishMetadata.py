@@ -189,7 +189,14 @@ def is_sauce(ingredients_filepath: str, ingredient: str) -> bool:
     if ingredient in sauces: return True
     else: return False
 
-def export_results(filename: str, actual_path: str, predicted_path: str, ingredients_path: str):
+def export_results(filename: str, actual_path: str, predicted_path: str, ingredients_path: str) -> None:
+    """
+    This function exports classification results.
+    :param filename: Name out the output file.
+    :param actual_path: Path of the csv file of Nutrition5k.
+    :param predicted_path: Path of the classification results of the model.
+    :param ingredients_path: Path of the csv of Nutrition5k that contains ingredients.
+    """
     results_df = pd.read_csv(predicted_path)
     output_df = results_df
     for dish in results_df['Dish ID'].values.tolist():
