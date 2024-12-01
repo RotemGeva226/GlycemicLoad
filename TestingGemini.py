@@ -13,7 +13,7 @@ api_key = os.getenv('GOOGLE_API_KEY')
 
 genai.configure(api_key=api_key)
 
-model = genai.GenerativeModel("gemini-1.5-pro")
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 def identify_ingredients(image_path: google.cloud.storage.Blob):
     """
@@ -23,13 +23,13 @@ def identify_ingredients(image_path: google.cloud.storage.Blob):
     """
     image_tmp = image_path.download_as_bytes()
     image_data = base64.b64encode(image_tmp).decode("utf-8")
-    prompt = ("List the ingredients of the dish for me,only the ingredients is important, not its location or shape. "
-              "don't list sauces, oil, sugar, salt, and spices.")
+    prompt = ("List the ingredients that appear in the image. For example: ['Apple', 'Beef', 'Melon'], without extra details. "
+              "Do not add phrases like: Here's a list of the ingredients visible in the image:")
     response = model.generate_content(
         [{'mime_type': 'image/png', 'data': image_data}, prompt])
     input_list = response.text.splitlines()
-    ingredients = [item.lstrip('* ').strip() for item in input_list if item.startswith('*')]
-    return ingredients
+    print(f'The answer from Gemini is: {input_list}')
+    return input_list
 
 def ingredients_analysis(limit: int):
     """
@@ -56,4 +56,4 @@ def ingredients_analysis(limit: int):
                     print(f"Added new data, current data points is: {len(res)}")
     res.to_csv('GeminiResults.csv', index=False)
 
-ingredients_analysis(limit=1)
+ingredients_analysis(limit=15)

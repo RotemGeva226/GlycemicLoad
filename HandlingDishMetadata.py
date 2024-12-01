@@ -121,12 +121,12 @@ def calculate_iis(ingr_actual: list = None, ingr_predicted: list = None, mode: s
     """
     global tp, fp, fn
     print(f"Calculating IIS using mode: {mode}...")
+    shared_ingr, extra_ingr, missing_ingr = is_contained(ingr_predicted, ingr_actual)
     match mode:
         case 'automatic':
-            shared_ingr, extra_ingr, missing_ingr = is_contained(ingr_predicted, ingr_actual)
-            tp = len(shared_ingr)  # How many ingr overlap
-            fn = len(missing_ingr)  # How many ingr in actual and not in predicted
-            fp = len(extra_ingr)  # How many ingredients appear in predicted but not in actual?
+                tp = len(shared_ingr)  # How many ingr overlap
+                fn = len(missing_ingr)  # How many ingr in actual and not in predicted
+                fp = len(extra_ingr)  # How many ingredients appear in predicted but not in actual?
         case 'manual':
             tp = int(input("Enter TP (num of matching items)."))
             fn = int(input("Enter FN (items found in actual and not in predicted)."))
@@ -209,17 +209,18 @@ if __name__ == '__main__':
     actual = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Nutrition5k dataset\nutrition5k_dataset_metadata_dish_metadata_cafe1.csv"
     predicted = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Classification\Classification Results\ClaudeResults.csv"
     ingredients = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Nutrition5k dataset\nutrition5k_dataset_metadata_ingredients_metadata.csv"
-    export_results('ClaudeResultsWithIIS', actual, predicted, ingredients)
-    # actual_ingr, predicted_ingr = calc_actual_and_predicted_ingredients(actual, predicted, ingredients, "dish_1558116001")
-    # calculate_iis(actual_ingr, predicted_ingr, mode='automatic')
-    # answer_quality = input("Is the calculation ok?")
-    # match answer_quality:
-    #     case 'y':
-    #         sys.exit()
-    #     case 'n':
-    #         calculate_iis()
+    # export_results('ClaudeResultsWithIIS', actual, predicted, ingredients)
+    actual_ingr, predicted_ingr = calc_actual_and_predicted_ingredients(actual, predicted, ingredients, "dish_1559841091")
+    calculate_iis(actual_ingr, predicted_ingr, mode='manual')
+    answer_quality = input("Is the calculation ok?")
+    match answer_quality:
+        case 'y':
+            sys.exit()
+        case 'n':
+            calculate_iis()
 
 # extract_num_of_ingredients_without_sauce_dishes(path_ingr=r"C:\Users\rotem.geva\OneDrive - Afeka College Of Engineering\פרויקט גמר\Nutrition5k dataset\nutrition5k_dataset_metadata_ingredients_metadata.csv",
 #                                                 path_dish_metadata=r"C:\Users\rotem.geva\OneDrive - Afeka College Of Engineering\פרויקט גמר\Nutrition5k dataset\nutrition5k_dataset_metadata_dish_metadata_cafe1.csv")
+
 
 
