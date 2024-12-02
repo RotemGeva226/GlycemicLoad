@@ -210,14 +210,14 @@ if __name__ == '__main__':
     predicted = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Classification\Classification Results\ClaudeResults.csv"
     ingredients = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Nutrition5k dataset\nutrition5k_dataset_metadata_ingredients_metadata.csv"
     # export_results('ClaudeResultsWithIIS', actual, predicted, ingredients)
-    actual_ingr, predicted_ingr = calc_actual_and_predicted_ingredients(actual, predicted, ingredients, "dish_1559841091")
+    actual_ingr, predicted_ingr = calc_actual_and_predicted_ingredients(actual, predicted, ingredients, "dish_1562009006")
     calculate_iis(actual_ingr, predicted_ingr, mode='manual')
-    answer_quality = input("Is the calculation ok?")
-    match answer_quality:
-        case 'y':
-            sys.exit()
-        case 'n':
-            calculate_iis()
+    # answer_quality = input("Is the calculation ok?")
+    # match answer_quality:
+    #     case 'y':
+    #         sys.exit()
+    #     case 'n':
+    #         calculate_iis()
 
 # extract_num_of_ingredients_without_sauce_dishes(path_ingr=r"C:\Users\rotem.geva\OneDrive - Afeka College Of Engineering\פרויקט גמר\Nutrition5k dataset\nutrition5k_dataset_metadata_ingredients_metadata.csv",
 #                                                 path_dish_metadata=r"C:\Users\rotem.geva\OneDrive - Afeka College Of Engineering\פרויקט גמר\Nutrition5k dataset\nutrition5k_dataset_metadata_dish_metadata_cafe1.csv")
