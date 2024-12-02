@@ -24,12 +24,12 @@ def identify_ingredients(image_path: google.cloud.storage.Blob):
     image_tmp = image_path.download_as_bytes()
     image_data = base64.b64encode(image_tmp).decode("utf-8")
     prompt = ("List the ingredients that appear in the image. For example: ['Apple', 'Beef', 'Melon'], without extra details. "
-              "Do not add phrases like: Here's a list of the ingredients visible in the image:")
+              "Do not add phrases like: Here's a list of the ingredients visible in the image:, Just list the food items you see.")
     response = model.generate_content(
         [{'mime_type': 'image/png', 'data': image_data}, prompt])
-    input_list = response.text.splitlines()
-    print(f'The answer from Gemini is: {input_list}')
-    return input_list
+    output = response.text.splitlines()
+    print(f'The answer from Gemini is: {output}')
+    return output
 
 def ingredients_analysis(limit: int):
     """
@@ -38,7 +38,7 @@ def ingredients_analysis(limit: int):
     :param limit: How many dishes the output should contain.
     """
     res = pd.DataFrame(columns=['Dish ID', 'Predicted Ingredients'])
-    relevant_dishes_df = pd.read_csv(r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final "
+    relevant_dishes_df = pd.read_csv(r"C:\Users\rotem.geva\OneDrive - Afeka College Of Engineering\Final "
                                   r"Project\Nutrition5k dataset\dish_ingr_count_without_sauce.csv")
     relevant_dishes = relevant_dishes_df[relevant_dishes_df['ingr_count'] > 3]['dish_id'].tolist()
     storage_client = storage.Client.create_anonymous_client()
