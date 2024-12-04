@@ -12,7 +12,7 @@ os.environ["ANTHROPIC_API_KEY"] = ""
 
 client = anthropic.Anthropic()
 
-def identify_ingredients(image_path: google.cloud.storage.Blob) -> list:
+def identify_ingredients(image_path: google.cloud.storage.Blob) -> str:
     """
     This function outputs the ingredients that appear in the plate as a text message.
     :param image_path: The path of the image.
@@ -21,11 +21,8 @@ def identify_ingredients(image_path: google.cloud.storage.Blob) -> list:
     image_media_type = "image/png"
     image_tmp = image_path.download_as_bytes()
     image_data = base64.b64encode(image_tmp).decode("utf-8")
-    prompt = ("You are a chef, be as precise as possible."
-              "List only the identifiable ingredients on this plate, being as specific as possible with varieties. "
-              "Write each ingredient without descriptions or additional commentary. "
-              "Focus only on what's visible on the plate. Do not add additional notes to the list,"
-              " that do not concern the ingredients.")
+    prompt = ("List the food items you see in the image. For example: ['Apple', 'Melon']."
+              "Do not describe the surroundings and do not describe the food items you see.")
     message = anthropic.Anthropic().messages.create(
         model="claude-3-5-sonnet-20241022",
         max_tokens=1024,
@@ -46,10 +43,8 @@ def identify_ingredients(image_path: google.cloud.storage.Blob) -> list:
             }
         ],
     )
-    text = message.content[0].text
-    ingredients = [line.replace('- ', '').replace('(appears to be breakfast-style)', '').strip()
-                   for line in text.split('\n')
-                   if line.strip()]
+    ingredients = message.content[0].text
+    print(f'Returned ingredients are: {ingredients}')
     return ingredients
 
 def ingredients_analysis(limit: int):
@@ -58,23 +53,32 @@ def ingredients_analysis(limit: int):
     Then, it outputs the dish id and the predicted ingredients to a csv.
     :param limit: How many dishes the output should contain.
     """
-    res = pd.DataFrame(columns=['Dish ID', 'Predicted Ingredients'])
-    relevant_dishes_df = pd.read_csv(r"C:\Users\rotem.geva\OneDrive - Afeka College Of Engineering\Final "
-                                  r"Project\Nutrition5k dataset\dish_ingr_count_without_sauce.csv")
-    relevant_dishes = relevant_dishes_df[relevant_dishes_df['ingr_count'] > 3]['dish_id'].tolist()
-    storage_client = storage.Client.create_anonymous_client()
-    bucket = storage_client.bucket("nutrition5k_dataset")
-    blobs = bucket.list_blobs(prefix="nutrition5k_dataset/imagery/realsense_overhead/")
+    try:
+        res = pd.DataFrame(columns=['Dish ID', 'Predicted Ingredients'])
+        relevant_dishes_df = pd.read_csv(r"C:\Users\rotem.geva\OneDrive - Afeka College Of Engineering\Final Project"
+                                         r"\Nutrition5k dataset\Dishes for classification test- full.csv")
+        relevant_dishes = relevant_dishes_df['Dish ID'].values.tolist()
+        already_viewed_dishes = pd.read_csv(r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\ClaudeResultsSummary.csv")
+        already_viewed_dishes = already_viewed_dishes['Dish ID'].values.tolist()
+        storage_client = storage.Client.create_anonymous_client()
+        bucket = storage_client.bucket("nutrition5k_dataset")
+        blobs = bucket.list_blobs(prefix="nutrition5k_dataset/imagery/realsense_overhead/")
 
-    for blob in blobs:
-        if len(res) != limit:
-            if str(blob.name).__contains__('rgb'):
-                current_dish_id = Path(blob.name).parent.name
-                if current_dish_id in relevant_dishes:
-                    ingredients = identify_ingredients(blob)
-                    new_data = {'Dish ID': current_dish_id, 'Predicted Ingredients': ingredients}
-                    res.loc[len(res)] = new_data
-                    print(f"Added new data, current data points is: {len(res)}")
-    res.to_csv('ClaudeResults.csv', index=False)
+        for blob in blobs:
+            blob_name = Path(blob.name).parent.name
+            if len(res) != limit and blob_name in relevant_dishes and blob_name not in already_viewed_dishes:
+                if str(blob.name).__contains__('rgb'):
+                    current_dish_id = blob_name
+                    if current_dish_id in relevant_dishes:
+                        ingredients = identify_ingredients(blob)
+                        new_data = {'Dish ID': current_dish_id, 'Predicted Ingredients': ingredients}
+                        res.loc[len(res)] = new_data
+                        print(f"Added new data, there are: {len(res)} data points now")
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
-ingredients_analysis(limit=700)
+    finally:
+        res.to_csv('ClaudeResults.csv', index=False)
+        print("CSV has been saved.")
+
+ingredients_analysis(limit=86)
