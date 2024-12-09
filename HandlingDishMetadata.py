@@ -1,4 +1,3 @@
-import sys
 import pandas as pd
 import re
 
@@ -18,7 +17,8 @@ def extract_num_of_ingredients(path_dish_metadata: str) -> None:
     result_df.to_csv('dish_ingr_count.csv', index=False)
     print("Results saved to 'dish_ingr_count.csv'")
 
-def extract_num_of_ingredients_without_sauce_dishes(path_ingr:str, path_dish_metadata:str):
+
+def extract_num_of_ingredients_without_sauce_dishes(path_ingr: str, path_dish_metadata: str):
     """
     This function receives dish metadata of Nutrition5k dataset and extract for each dish the number of ingredients.
     This does not include ingredients that fall under sauce category.
@@ -66,6 +66,7 @@ def extract_num_of_ingredients_without_sauce_dishes(path_ingr:str, path_dish_met
     result_df.to_csv('dish_ingr_count_without_sauce.csv', index=False)
     print("\nResults saved to 'dish_ingr_count_without_sauce.csv'")
 
+
 def is_contained(ls1: list, ls2: list) -> tuple:
     """
     This function checks if each element of ls1 is partially contained in ls2.
@@ -76,7 +77,7 @@ def is_contained(ls1: list, ls2: list) -> tuple:
 
     def preprocess_string(s):
         # Convert to lowercase for case-insensitive comparison
-        return re.sub(r'[^\w\s]', '', s.lower()) # To remove commas from items
+        return re.sub(r'[^\w\s]', '', s.lower())  # To remove commas from items
 
     match_results = []
     not_in_ls2 = []  # The ingredients the model missed.
@@ -111,7 +112,8 @@ def is_contained(ls1: list, ls2: list) -> tuple:
     print(f"The missing items are: {not_in_ls1} ")
     return matched_items, not_in_ls2, not_in_ls1
 
-def calculate_iis(ingr_actual: list = None, ingr_predicted: list = None, mode: str='manual') -> float:
+
+def calculate_iis(ingr_actual: list = None, ingr_predicted: list = None, mode: str = 'manual') -> float:
     """
     This function calculates Ingredients Identification Score (IIS), similar to F1 score.
     :param mode: Automatic uses lists, while manual uses manually inserted tp, fn and fp.
@@ -124,22 +126,24 @@ def calculate_iis(ingr_actual: list = None, ingr_predicted: list = None, mode: s
     shared_ingr, extra_ingr, missing_ingr = is_contained(ingr_predicted, ingr_actual)
     match mode:
         case 'automatic':
-                tp = len(shared_ingr)  # How many ingr overlap
-                fn = len(missing_ingr)  # How many ingr in actual and not in predicted
-                fp = len(extra_ingr)  # How many ingredients appear in predicted but not in actual?
+            tp = len(shared_ingr)  # How many ingr overlap
+            fn = len(missing_ingr)  # How many ingr in actual and not in predicted
+            fp = len(extra_ingr)  # How many ingredients appear in predicted but not in actual?
         case 'manual':
             tp = int(input("Enter TP (num of matching items)."))
             fn = int(input("Enter FN (items found in actual and not in predicted)."))
             fp = int(input("Enter FP (items in predicted that not in actual)."))
     if tp == 0:
         return 0
-    precision = tp/(tp+fp)
-    recall = tp/(tp+fn)
-    iis = float("{:.2f}".format((2 * precision * recall)/(precision + recall))) # Ingredients Identification Score
+    precision = tp / (tp + fp)
+    recall = tp / (tp + fn)
+    iis = float("{:.2f}".format((2 * precision * recall) / (precision + recall)))  # Ingredients Identification Score
     print(f"IIS is: {iis}")
     return iis
 
-def calc_actual_and_predicted_ingredients(actual_path: str, predicted_path: str, ingredients_path: str, dish_id: str) -> tuple:
+
+def calc_actual_and_predicted_ingredients(actual_path: str, predicted_path: str, ingredients_path: str,
+                                          dish_id: str) -> tuple:
     """
     This function calculates the actual ingredients as they are listed in Nutrition5k dataset.
     Also, the function calculates the predicted ingredients from the responses of the model.
@@ -156,26 +160,31 @@ def calc_actual_and_predicted_ingredients(actual_path: str, predicted_path: str,
     sauces = ingredients_df[ingredients_df['IsSauce'] == 'Yes']['ingr'].to_numpy()
 
     # Calculating the predicted ingredients of the dish
-    predicted_ingredients = str(predicted_df[predicted_df.iloc[:,0] == dish_id]['Predicted Ingredients'].to_numpy())
+    predicted_ingredients = str(predicted_df[predicted_df.iloc[:, 0] == dish_id]['Predicted Ingredients'].to_numpy())
     ls_predicted_ingredients = re.findall(r"'([^']*)'", predicted_ingredients)
     print(f"The predicted ingredients are: {ls_predicted_ingredients}, total: {len(ls_predicted_ingredients)}")
 
     # Calculating the actual ingredients of the dish
-    row = actual_df[actual_df.iloc[:,0] == dish_id]
+    row = actual_df[actual_df.iloc[:, 0] == dish_id]
     actual_ingredients = []
     for i in range(row.size - 1):
-        if row[i].values.dtype == object and pd.isna(row[i].values) != True: # If the cell contains a string
+        if isinstance(row[i], pd.Series):
+            value = row[i].values[0]  # Access the first element explicitly
+        else:
+            value = row[i]
+        if type(value) == str and pd.isna(value) != True:  # If the cell contains a string
             curr_val = ' '.join(row[i].values)
-            if curr_val.startswith('ingr') and row[i+1].values[0] not in sauces:
-                actual_ingredients.append(row[i+1].values[0])
+            if curr_val.startswith('ingr') and row[i + 1].values[0] not in sauces:
+                actual_ingredients.append(row[i + 1].values[0])
     print(f"The actual ingredients are: {actual_ingredients}, total: {len(actual_ingredients)}")
 
-    for ingredient in actual_ingredients: # Remove ingredients that were defined as sauces
+    for ingredient in actual_ingredients:  # Remove ingredients that were defined as sauces
         if is_sauce(ingredients_path, ingredient):
             print(f"Removed {ingredient} because it is a sauce.")
             actual_ingredients.remove(ingredient)
 
     return actual_ingredients, ls_predicted_ingredients
+
 
 def is_sauce(ingredients_filepath: str, ingredient: str) -> bool:
     """
@@ -186,8 +195,11 @@ def is_sauce(ingredients_filepath: str, ingredient: str) -> bool:
     """
     ingredients_data = pd.read_csv(ingredients_filepath)
     sauces = ingredients_data[ingredients_data['IsSauce'] == 'Yes']['ingr'].tolist()
-    if ingredient in sauces: return True
-    else: return False
+    if ingredient in sauces:
+        return True
+    else:
+        return False
+
 
 def export_results(filename: str, actual_path: str, predicted_path: str, ingredients_path: str) -> None:
     """
@@ -200,27 +212,35 @@ def export_results(filename: str, actual_path: str, predicted_path: str, ingredi
     results_df = pd.read_csv(predicted_path)
     output_df = results_df
     for dish in results_df['Dish ID'].values.tolist():
-        actual_ingr, predicted_ingr = calc_actual_and_predicted_ingredients(actual_path, predicted_path, ingredients_path, dish)
+        actual_ingr, predicted_ingr = calc_actual_and_predicted_ingredients(actual_path, predicted_path,
+                                                                            ingredients_path, dish)
         iis = calculate_iis(actual_ingr, predicted_ingr, mode='automatic')
         output_df.loc[output_df['Dish ID'] == dish, 'IIS'] = iis
-    output_df.to_csv(filename+".csv", index=False)
+    output_df.to_csv(filename + ".csv", index=False)
+
+def create_new_dataset(relevant_dishes_filepath: str, curr_dataset_filepath: str) -> None:
+    relevant_dishes_df = pd.read_csv(relevant_dishes_filepath)
+    curr_dataset_df = pd.read_csv(curr_dataset_filepath, header=None)
+    relevant_dishes_ls = relevant_dishes_df[relevant_dishes_df['IIS'] > 0.45]['Dish ID'].values.tolist()
+    output = curr_dataset_df[curr_dataset_df.iloc[:, 0].isin(relevant_dishes_ls)]
+    output.to_csv('Nutrition5kModified.csv', index=False)
+
 
 if __name__ == '__main__':
     actual = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Nutrition5k dataset\nutrition5k_dataset_metadata_dish_metadata_cafe1.csv"
-    predicted = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Classification\Classification Results\ClaudeResults.csv"
+    predicted = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Classification\Classification Results\ClaudeResultsSummary.csv"
     ingredients = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Nutrition5k dataset\nutrition5k_dataset_metadata_ingredients_metadata.csv"
+    res_with_iis = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Classification\Classification Results\ClaudeResultsWithIIS.csv"
     # export_results('ClaudeResultsWithIIS', actual, predicted, ingredients)
-    actual_ingr, predicted_ingr = calc_actual_and_predicted_ingredients(actual, predicted, ingredients, "dish_1562009006")
-    calculate_iis(actual_ingr, predicted_ingr, mode='manual')
+    # actual_ingr, predicted_ingr = calc_actual_and_predicted_ingredients(actual, predicted, ingredients, "dish_1561062320")
+    # calculate_iis(actual_ingr, predicted_ingr, mode='manual')
     # answer_quality = input("Is the calculation ok?")
     # match answer_quality:
     #     case 'y':
     #         sys.exit()
     #     case 'n':
     #         calculate_iis()
+    create_new_dataset(res_with_iis, actual)
 
 # extract_num_of_ingredients_without_sauce_dishes(path_ingr=r"C:\Users\rotem.geva\OneDrive - Afeka College Of Engineering\פרויקט גמר\Nutrition5k dataset\nutrition5k_dataset_metadata_ingredients_metadata.csv",
 #                                                 path_dish_metadata=r"C:\Users\rotem.geva\OneDrive - Afeka College Of Engineering\פרויקט גמר\Nutrition5k dataset\nutrition5k_dataset_metadata_dish_metadata_cafe1.csv")
-
-
-
