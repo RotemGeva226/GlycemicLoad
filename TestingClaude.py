@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 
-os.environ["ANTHROPIC_API_KEY"] = "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"
+os.environ["ANTHROPIC_API_KEY"] = ""
 
 client = anthropic.Anthropic()
 
