@@ -6,9 +6,9 @@ import pandas as pd
 from google.cloud import storage
 from pathlib import Path
 
+api_key = open(r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Classification\Claude API Key.txt", "r").read()
 
-
-os.environ["ANTHROPIC_API_KEY"] = ""
+os.environ["ANTHROPIC_API_KEY"] = api_key
 
 client = anthropic.Anthropic()
 
@@ -92,8 +92,8 @@ def identify_portions(dish_id: str, ingr: list) -> str:
     """
     This function outputs the portion of each ingredient that appear in the plate as a text message.
     :param dish_id: Dish id according to Nutrition5k indexing.
-    :param ingr: A list of the ingredients the model identified in the image.
-    :return: A list that contains the portions of the ingredients.
+    :param ingr: A list of the ingredients the model previously identified in the image.
+    :return: The portion size in grams.
     """
     blobs = connect_nutrition5k(folder_name="nutrition5k_dataset/imagery/realsense_overhead/")
     for blob in blobs:
@@ -143,5 +143,25 @@ def identify_portions(dish_id: str, ingr: list) -> str:
     print(f'The portion size of {dish_id} is: {portions}')
     return portions
 
+def portions_analysis(input_filepath: str, actual_portions_filepath: str):
+    actual_portions_df = pd.read_csv(actual_portions_filepath, header=None)
+    input_df = pd.read_csv(input_filepath)
+    res = pd.DataFrame(columns=['Dish ID', 'Actual Portion[g]', 'Estimated Portion[g]'])
+    dishes = input_df['Dish ID'].values.tolist()
+    try:
+        for dish in dishes:
+            actual_total_portion = actual_portions_df[actual_portions_df.iloc[:, 0] == dish].iloc[0,2]
+            predicted_ingr = input_df[input_df['Dish ID'] == dish].iloc[0, 1]
+            predicted_total_portion = identify_portions(dish, predicted_ingr)
+            new_data = {'Dish ID': dish, 'Actual Portion[g]': actual_total_portion, 'Estimated Portion[g]': predicted_total_portion}
+            res.loc[len(res)] = new_data # Adding the new data point
+            print(f'There are currently: {len(res)} data points.')
 
-identify_portions('dish_1558026756', ['Bacon', 'Cantaloupe', 'Honeydew melon'])
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+    finally:
+        res.to_csv('PortionsEstimationClaudeResults.csv', index=False)
+        print("CSV has been saved.")
+
+
