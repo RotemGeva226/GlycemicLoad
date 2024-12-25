@@ -2,6 +2,7 @@ import anthropic
 import os
 import base64
 import google.cloud.storage
+import numpy as np
 import pandas as pd
 from google.cloud import storage
 from pathlib import Path
@@ -92,7 +93,7 @@ def identify_portions(dish_id: str, ingr: list) -> str:
     """
     This function outputs the portion of each ingredient that appear in the plate as a text message.
     :param dish_id: Dish id according to Nutrition5k indexing.
-    :param ingr: A list of the ingredients the model previously identified in the image.
+    :param ingr: A list of the ingredients the models previously identified in the image.
     :return: The portion size in grams.
     """
     blobs = connect_nutrition5k(folder_name="nutrition5k_dataset/imagery/realsense_overhead/")
@@ -143,7 +144,12 @@ def identify_portions(dish_id: str, ingr: list) -> str:
     print(f'The portion size of {dish_id} is: {portions}')
     return portions
 
-def portions_analysis(input_filepath: str, actual_portions_filepath: str):
+def portions_analysis(input_filepath: str, actual_portions_filepath: str) -> None:
+    """
+    This function calculates portions estimation for claude.
+    :param input_filepath: File that contains models classification results with dish id.
+    :param actual_portions_filepath: File that contains Nutrition5k dataset content.
+    """
     actual_portions_df = pd.read_csv(actual_portions_filepath, header=None)
     input_df = pd.read_csv(input_filepath)
     res = pd.DataFrame(columns=['Dish ID', 'Actual Portion[g]', 'Estimated Portion[g]'])
@@ -163,5 +169,28 @@ def portions_analysis(input_filepath: str, actual_portions_filepath: str):
     finally:
         res.to_csv('PortionsEstimationClaudeResults.csv', index=False)
         print("CSV has been saved.")
+
+def calculate_metric(input_filepath: str, mode: str):
+    df = pd.read_csv(input_filepath)
+    match mode.lower():
+        case 'mae':
+            df['error'] = abs(df['Actual Portion[g]'] - df['Estimated Portion[g]'])
+            mae = df['error'].mean()
+            print(f'The MAE is: {round(mae, 2)}')
+        case 'rmse':
+            df['squared_error'] = (df['Estimated Portion[g]'] - df['Actual Portion[g]']) ** 2
+            mse = df['squared_error'].mean()
+            rmse = np.sqrt(mse)
+            print(f'The RMSE is: {round(rmse, 2)}')
+        case 'rsquared':
+            tss = ((df['Actual Portion[g]'] - df['Actual Portion[g]'].mean()) ** 2).sum()
+            rss = ((df['Actual Portion[g]'] - df['Estimated Portion[g]']) ** 2).sum()
+            r_squared = 1 - (rss / tss)
+            print(f'The R-squared is: {round(r_squared, 2)}')
+
+file = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Portions Estimation\PortionsEstimationClaudeResults.csv"
+calculate_metric(file, mode='mae')
+calculate_metric(file, mode='rmse')
+calculate_metric(file, mode='rsquared')
 
 

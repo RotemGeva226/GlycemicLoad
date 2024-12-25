@@ -37,23 +37,28 @@ def ingredients_analysis(limit: int):
     Then, it outputs the dish id and the predicted ingredients to a csv.
     :param limit: How many dishes the output should contain.
     """
-    res = pd.DataFrame(columns=['Dish ID', 'Predicted Ingredients'])
-    relevant_dishes_df = pd.read_csv(r"C:\Users\rotem.geva\OneDrive - Afeka College Of Engineering\Final "
-                                  r"Project\Nutrition5k dataset\dish_ingr_count_without_sauce.csv")
-    relevant_dishes = relevant_dishes_df[relevant_dishes_df['ingr_count'] > 3]['dish_id'].tolist()
-    storage_client = storage.Client.create_anonymous_client()
-    bucket = storage_client.bucket("nutrition5k_dataset")
-    blobs = bucket.list_blobs(prefix="nutrition5k_dataset/imagery/realsense_overhead/")
+    try:
+        res = pd.DataFrame(columns=['Dish ID', 'Predicted Ingredients'])
+        relevant_dishes_df = pd.read_csv(r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final "
+                                         r"Project\Nutrition5k dataset\Nutrition5kModified.csv")
+        relevant_dishes = relevant_dishes_df.iloc[:, 0].values.tolist()
+        storage_client = storage.Client.create_anonymous_client()
+        bucket = storage_client.bucket("nutrition5k_dataset")
+        blobs = bucket.list_blobs(prefix="nutrition5k_dataset/imagery/realsense_overhead/")
 
-    for blob in blobs:
-        if len(res) != limit:
-            if str(blob.name).__contains__('rgb'):
-                current_dish_id = Path(blob.name).parent.name
-                if current_dish_id in relevant_dishes:
-                    ingredients = identify_ingredients(blob)
-                    new_data = {'Dish ID': current_dish_id, 'Predicted Ingredients': ingredients}
-                    res.loc[len(res)] = new_data
-                    print(f"Added new data, current data points is: {len(res)}")
-    res.to_csv('GeminiResults.csv', index=False)
+        for blob in blobs:
+            if len(res) != limit:
+                if str(blob.name).__contains__('rgb'):
+                    current_dish_id = Path(blob.name).parent.name
+                    if current_dish_id in relevant_dishes:
+                        ingredients = identify_ingredients(blob)
+                        new_data = {'Dish ID': current_dish_id, 'Predicted Ingredients': ingredients}
+                        res.loc[len(res)] = new_data
+                        print(f"Added new data, current data points is: {len(res)}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
-ingredients_analysis(limit=15)
+    finally:
+        res.to_csv('GeminiResults091224.csv', index=False)
+
+ingredients_analysis(limit=433)

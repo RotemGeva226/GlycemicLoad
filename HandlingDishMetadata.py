@@ -80,7 +80,7 @@ def is_contained(ls1: list, ls2: list) -> tuple:
         return re.sub(r'[^\w\s]', '', s.lower())  # To remove commas from items
 
     match_results = []
-    not_in_ls2 = []  # The ingredients the model missed.
+    not_in_ls2 = []  # The ingredients the models missed.
     not_in_ls1 = []  # The ingredients that are in ls2 but not in ls1.
 
     # Preprocess and tokenize ls2 items
@@ -117,8 +117,8 @@ def calculate_iis(ingr_actual: list = None, ingr_predicted: list = None, mode: s
     """
     This function calculates Ingredients Identification Score (IIS), similar to F1 score.
     :param mode: Automatic uses lists, while manual uses manually inserted tp, fn and fp.
-    :param ingr_actual: All the ingredients the model should identify.
-    :param ingr_predicted: All the ingredients the model identified.
+    :param ingr_actual: All the ingredients the models should identify.
+    :param ingr_predicted: All the ingredients the models identified.
     :return: IIS
     """
     global tp, fp, fn
@@ -146,12 +146,12 @@ def calc_actual_and_predicted_ingredients(actual_path: str, predicted_path: str,
                                           dish_id: str) -> tuple:
     """
     This function calculates the actual ingredients as they are listed in Nutrition5k dataset.
-    Also, the function calculates the predicted ingredients from the responses of the model.
+    Also, the function calculates the predicted ingredients from the responses of the models.
     :param actual_path: Path to Nutrition5k dish data csv.
-    :param predicted_path: Path to model results csv.
+    :param predicted_path: Path to models results csv.
     :param ingredients_path: Path to ingredients metadata of Nutrition5k.
     :param dish_id: Dish id as it described in Nutrition5k dataset.
-    :return: A tuple contains two lists, one contains the actual ingr and the other the ingr the model predicted.
+    :return: A tuple contains two lists, one contains the actual ingr and the other the ingr the models predicted.
     """
     print(f"Calculating ingredients for dish: {dish_id}...")
     actual_df = pd.read_csv(actual_path, header=None)
@@ -206,7 +206,7 @@ def export_results(filename: str, actual_path: str, predicted_path: str, ingredi
     This function exports classification results.
     :param filename: Name out the output file.
     :param actual_path: Path of the csv file of Nutrition5k.
-    :param predicted_path: Path of the classification results of the model.
+    :param predicted_path: Path of the classification results of the models.
     :param ingredients_path: Path of the csv of Nutrition5k that contains ingredients.
     """
     results_df = pd.read_csv(predicted_path)
@@ -225,13 +225,44 @@ def create_new_dataset(relevant_dishes_filepath: str, curr_dataset_filepath: str
     output = curr_dataset_df[curr_dataset_df.iloc[:, 0].isin(relevant_dishes_ls)]
     output.to_csv('Nutrition5kModified.csv', index=False)
 
+def extract_ingr(input_filepath: str):
+    """
+    This function extracts the ingredients from the Nutrition5k dataset.
+    :param input_filepath: Input file in form of Nutrition5k dataset.
+    """
+    data = pd.read_csv(input_filepath, header=None)
+    ingredients = []
+    for index, row in data.iterrows():
+        for i in range(len(row) - 1):
+            current_value = row[i]
+            if type(current_value) is str:
+                if current_value.startswith('ingr'):
+                    next_value = row[i + 1]
+                    if next_value not in ingredients:
+                        ingredients.append(next_value)
+    res = pd.DataFrame({'Used Ingredients': ingredients})
+    res.to_csv('UsedIngredients.csv', index=False)
+
+def remove_sauces(input_filepath: str, sauces_filepath: str):
+    ingr_data = pd.read_csv(input_filepath)
+    sauces_data = pd.read_csv(sauces_filepath)
+    sauces: list = sauces_data[sauces_data['IsSauce'] == 'Yes']['ingr'].values.tolist()
+    indices_to_drop = []
+
+    for index, row in ingr_data.iterrows():
+       if row[0] in sauces:
+           indices_to_drop.append(index)
+
+    res = ingr_data.drop(indices_to_drop)
+    res.to_csv('UsedIngredientsDuringClassificationWithoutSauces.csv', index=False)
+
 
 if __name__ == '__main__':
-    actual = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Nutrition5k dataset\nutrition5k_dataset_metadata_dish_metadata_cafe1.csv"
-    predicted = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Classification\Classification Results\ClaudeResultsSummary.csv"
-    ingredients = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Nutrition5k dataset\nutrition5k_dataset_metadata_ingredients_metadata.csv"
-    res_with_iis = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Classification\Classification Results\ClaudeResultsWithIIS.csv"
-    # export_results('ClaudeResultsWithIIS', actual, predicted, ingredients)
+    actual = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Nutrition5k dataset\Nutrition5kModified.csv"
+    predicted = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Classification\Classification Results\ChatGPT_Results.csv"
+    sauces = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Nutrition5k dataset\nutrition5k_dataset_metadata_ingredients_metadata.csv"
+    ingr = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Classification\UsedIngredientsDuringClassification.csv"
+    remove_sauces(ingr, sauces)
     # actual_ingr, predicted_ingr = calc_actual_and_predicted_ingredients(actual, predicted, ingredients, "dish_1561062320")
     # calculate_iis(actual_ingr, predicted_ingr, mode='manual')
     # answer_quality = input("Is the calculation ok?")
@@ -240,7 +271,6 @@ if __name__ == '__main__':
     #         sys.exit()
     #     case 'n':
     #         calculate_iis()
-    create_new_dataset(res_with_iis, actual)
 
 # extract_num_of_ingredients_without_sauce_dishes(path_ingr=r"C:\Users\rotem.geva\OneDrive - Afeka College Of Engineering\פרויקט גמר\Nutrition5k dataset\nutrition5k_dataset_metadata_ingredients_metadata.csv",
 #                                                 path_dish_metadata=r"C:\Users\rotem.geva\OneDrive - Afeka College Of Engineering\פרויקט גמר\Nutrition5k dataset\nutrition5k_dataset_metadata_dish_metadata_cafe1.csv")
