@@ -66,15 +66,13 @@ def ingredients_analysis(limit: int):
         relevant_dishes_df = pd.read_csv(r"C:\Users\rotem.geva\OneDrive - Afeka College Of Engineering\Final Project"
                                          r"\Nutrition5k dataset\Dishes for classification test- full.csv")
         relevant_dishes = relevant_dishes_df['Dish ID'].values.tolist()
-        already_viewed_dishes = pd.read_csv(r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\ClaudeResultsSummary.csv")
-        already_viewed_dishes = already_viewed_dishes['Dish ID'].values.tolist()
         storage_client = storage.Client.create_anonymous_client()
         bucket = storage_client.bucket("nutrition5k_dataset")
         blobs = bucket.list_blobs(prefix="nutrition5k_dataset/imagery/realsense_overhead/")
 
         for blob in blobs:
             blob_name = Path(blob.name).parent.name
-            if len(res) != limit and blob_name in relevant_dishes and blob_name not in already_viewed_dishes:
+            if len(res) != limit and blob_name in relevant_dishes and blob_name:
                 if str(blob.name).__contains__('rgb'):
                     current_dish_id = blob_name
                     if current_dish_id in relevant_dishes:
@@ -188,9 +186,10 @@ def calculate_metric(input_filepath: str, mode: str):
             r_squared = 1 - (rss / tss)
             print(f'The R-squared is: {round(r_squared, 2)}')
 
-file = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Portions Estimation\PortionsEstimationClaudeResults.csv"
-calculate_metric(file, mode='mae')
-calculate_metric(file, mode='rmse')
-calculate_metric(file, mode='rsquared')
+if __name__ == '__main__':
+    file = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Portions Estimation\PortionsEstimationClaudeResults.csv"
+    calculate_metric(file, mode='mae')
+    calculate_metric(file, mode='rmse')
+    calculate_metric(file, mode='rsquared')
 
 
