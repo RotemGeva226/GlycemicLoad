@@ -13,6 +13,7 @@ REALSENSE_OVERHEAD_PATH = "nutrition5k_dataset/imagery/realsense_overhead/"
 CURRENT_DIR = os.path.dirname(os.getcwd())
 PROCESSED_DATA_DIR = os.path.join(CURRENT_DIR, r"data\processed")
 RAW_DATA_DIR = os.path.join(CURRENT_DIR, r"data\raw")
+INGREDIENTS_METADATA_FILEPATH = os.path.join(CURRENT_DIR, r"data/processed/ingredients.csv")
 
 
 def download_image_from_gcs(bucket_name, source_blob_name, local_temp_path) -> storage.Blob:
@@ -61,6 +62,13 @@ def preprocess_rgbd(image_path, target_size=(224, 224)) -> torch.Tensor:
     rgbd_tensor = torch.cat((rgb_tensor, depth_tensor), dim=0) # Combine both images
     return rgbd_tensor
 
+
+def get_glycemic_load(dish_id):
+    ingredients_metadata_df = pd.read_csv(INGREDIENTS_METADATA_FILEPATH)
+    total_gl = ingredients_metadata_df.groupby("Dish ID").get_group(dish_id)['Glycemic Load'].sum()
+    return total_gl
+
+
 def preprocess_dataset(annotations_file, target_size=(224, 224)):
     """
     Preprocess the dataset by temporarily downloading images, processing them, and saving results.
@@ -74,8 +82,8 @@ def preprocess_dataset(annotations_file, target_size=(224, 224)):
 
     for _, row in tqdm(annotations.iterrows(), total=len(annotations)):
         dish_id = row.iloc[0]
-        gcs_image_path_rgb = f"{REALSENSE_OVERHEAD_PATH}dish_{dish_id}/rgb.png"
-        gcs_image_path_rgbd = f"{REALSENSE_OVERHEAD_PATH}dish_{dish_id}/depth_color.png"
+        gcs_image_path_rgb = f"{REALSENSE_OVERHEAD_PATH}{dish_id}/rgb.png"
+        gcs_image_path_rgbd = f"{REALSENSE_OVERHEAD_PATH}{dish_id}/depth_color.png"
         local_temp_path_rgb = "temp_image_rgb.jpg"
         local_temp_path_rgbd = "temp_image_rgbd.jpg"
 
@@ -94,8 +102,7 @@ def preprocess_dataset(annotations_file, target_size=(224, 224)):
                 "image_id": dish_id,
                 "processed_image_path_rgb": output_path_rgb,
                 "processed_imgae_path_rgbd": output_path_rgbd,
-                "ingredients": get_ingredients_from_row(row),
-                "glycemic_load": get_glycemic_load(row)
+                "glycemic load": get_glycemic_load(dish_id)
             })
 
         finally:
@@ -107,4 +114,4 @@ def preprocess_dataset(annotations_file, target_size=(224, 224)):
 
 
 if __name__ == "__main__":
-    preprocess_rgb(r"C:\Users\rotem.geva\Desktop\rgb.png", (224, 224))
+    preprocess_dataset(os.path.join(RAW_DATA_DIR, "Nutrition5kModified700.csv"), (224, 224))
