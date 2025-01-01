@@ -221,9 +221,9 @@ def export_results(filename: str, actual_path: str, predicted_path: str, ingredi
 def create_new_dataset(relevant_dishes_filepath: str, curr_dataset_filepath: str) -> None:
     relevant_dishes_df = pd.read_csv(relevant_dishes_filepath)
     curr_dataset_df = pd.read_csv(curr_dataset_filepath, header=None)
-    relevant_dishes_ls = relevant_dishes_df[relevant_dishes_df['IIS'] > 0.45]['Dish ID'].values.tolist()
+    relevant_dishes_ls = relevant_dishes_df['Dish ID'].values.tolist()
     output = curr_dataset_df[curr_dataset_df.iloc[:, 0].isin(relevant_dishes_ls)]
-    output.to_csv('Nutrition5kModified.csv', index=False)
+    output.to_csv('Nutrition5kModified700.csv', index=False)
 
 def extract_ingr(input_filepath: str):
     """
@@ -262,15 +262,6 @@ if __name__ == '__main__':
     predicted = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Classification\Classification Results\ChatGPT_Results.csv"
     sauces = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Nutrition5k dataset\nutrition5k_dataset_metadata_ingredients_metadata.csv"
     ingr = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Classification\UsedIngredientsDuringClassification.csv"
-    remove_sauces(ingr, sauces)
-    # actual_ingr, predicted_ingr = calc_actual_and_predicted_ingredients(actual, predicted, ingredients, "dish_1561062320")
-    # calculate_iis(actual_ingr, predicted_ingr, mode='manual')
-    # answer_quality = input("Is the calculation ok?")
-    # match answer_quality:
-    #     case 'y':
-    #         sys.exit()
-    #     case 'n':
-    #         calculate_iis()
-
-# extract_num_of_ingredients_without_sauce_dishes(path_ingr=r"C:\Users\rotem.geva\OneDrive - Afeka College Of Engineering\פרויקט גמר\Nutrition5k dataset\nutrition5k_dataset_metadata_ingredients_metadata.csv",
-#                                                 path_dish_metadata=r"C:\Users\rotem.geva\OneDrive - Afeka College Of Engineering\פרויקט גמר\Nutrition5k dataset\nutrition5k_dataset_metadata_dish_metadata_cafe1.csv")
+    relevant_dishes = r"C:\Users\rotem.geva\OneDrive - Afeka College Of Engineering\Final Project\Classification\Classification Results\ClaudeResults.csv"
+    curr_dataset = r"C:\Users\rotem.geva\OneDrive - Afeka College Of Engineering\Final Project\Nutrition5k dataset\nutrition5k_dataset_metadata_dish_metadata_cafe1.csv"
+    create_new_dataset(relevant_dishes, curr_dataset)
