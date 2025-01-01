@@ -1,10 +1,12 @@
 # Functions for preprocessing images and ingredient labels
+import torch
 from google.cloud import storage
 import os
-import cv2
-import numpy as np
 import pandas as pd
 from tqdm import tqdm
+import torchvision.transforms as transforms
+from PIL import Image
+
 
 BUCKET_NAME = "nutrition5k_dataset"
 REALSENSE_OVERHEAD_PATH = "nutrition5k_dataset/imagery/realsense_overhead/"
@@ -27,22 +29,37 @@ def download_image_from_gcs(bucket_name, source_blob_name, local_temp_path) -> s
     blob.download_to_filename(local_temp_path)
     return local_temp_path
 
+def preprocess_rgb(image_raw, target_size=(224, 224)) -> torch.Tensor:
+    # Normalize using ImageNet means and standard deviations
+    transform = transforms.Compose([
+        transforms.Resize(target_size),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                             std=[0.229, 0.224, 0.225])
+    ])
+    image = Image.open(image_raw).convert("RGB")
+    return transform(image)
 
-def preprocess_image(image_path, target_size=(224, 224)) -> np.ndarray:
-    """
-    Preprocess a single image: resize and normalize pixel values.
-    :param image_path: Local path to the image.
-    :param target_size: Target size for resizing the image.
-    :return: Preprocessed image as a NumPy array.
-    """
-    image = cv2.imread(image_path)
-    if image is None:
-        raise FileNotFoundError(f"Image not found: {image_path}")
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # Convert to RGB
-    image = cv2.resize(image, target_size)
-    image = image / 255.0  # Normalize to [0, 1]
-    return image
+def preprocess_rgbd(image_path, target_size=(224, 224)) -> torch.Tensor:
+    image = Image.open(image_path).convert("RGBA")
+    rgb_image = image.split()[:3]
+    depth_channel = image.split()[3]
+    transform_rgb = transforms.Compose([
+        transforms.Resize(target_size),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                             std=[0.229, 0.224, 0.225])
+    ])
+    rgb_tensor = transform_rgb(Image.merge("RGB", rgb_image))
 
+    # Depth
+    transform_depth = transforms.Compose([
+        transforms.Resize(target_size),
+        transforms.ToTensor()
+    ])
+    depth_tensor = transform_depth(depth_channel)
+    rgbd_tensor = torch.cat((rgb_tensor, depth_tensor), dim=0) # Combine both images
+    return rgbd_tensor
 
 def preprocess_dataset(annotations_file, target_size=(224, 224)):
     """
@@ -57,27 +74,37 @@ def preprocess_dataset(annotations_file, target_size=(224, 224)):
 
     for _, row in tqdm(annotations.iterrows(), total=len(annotations)):
         dish_id = row.iloc[0]
-        gcs_image_path = f"{REALSENSE_OVERHEAD_PATH}dish_{dish_id}/rgb.png"
-        local_temp_path = "temp_image.jpg"
+        gcs_image_path_rgb = f"{REALSENSE_OVERHEAD_PATH}dish_{dish_id}/rgb.png"
+        gcs_image_path_rgbd = f"{REALSENSE_OVERHEAD_PATH}dish_{dish_id}/depth_color.png"
+        local_temp_path_rgb = "temp_image_rgb.jpg"
+        local_temp_path_rgbd = "temp_image_rgbd.jpg"
 
         # Downloading the image and appending new info
         try:
-            download_image_from_gcs(BUCKET_NAME, gcs_image_path, local_temp_path)
-            preprocessed_image = preprocess_image(local_temp_path, target_size)
-            output_path = os.path.join(PROCESSED_DATA_DIR, f"{dish_id}.npy")
-            np.save(output_path, preprocessed_image)
+            download_image_from_gcs(BUCKET_NAME, gcs_image_path_rgb, local_temp_path_rgb)
+            download_image_from_gcs(BUCKET_NAME, gcs_image_path_rgbd, local_temp_path_rgbd)
+            preprocessed_image_rgb = preprocess_rgb(local_temp_path_rgb, target_size)
+            preprocessed_image_rgbd = preprocess_rgbd(local_temp_path_rgbd, target_size)
+            output_path_rgb = os.path.join(PROCESSED_DATA_DIR, f"rgb_{dish_id}.pt")
+            output_path_rgbd = os.path.join(PROCESSED_DATA_DIR, f"rgbd_{dish_id}.pt")
+            torch.save(preprocessed_image_rgb, output_path_rgb)
+            torch.save(preprocessed_image_rgbd, output_path_rgbd)
 
             preprocessed_data.append({
                 "image_id": dish_id,
-                "processed_image_path": output_path,
-                "portion_size": row.iloc[2]
+                "processed_image_path_rgb": output_path_rgb,
+                "processed_imgae_path_rgbd": output_path_rgbd,
+                "ingredients": get_ingredients_from_row(row),
+                "glycemic_load": get_glycemic_load(row)
             })
 
         finally:
-            if os.path.exists(local_temp_path):
-                os.remove(local_temp_path)
+            if os.path.exists(gcs_image_path_rgb):
+                os.remove(gcs_image_path_rgb)
 
     pd.DataFrame(preprocessed_data).to_csv(os.path.join(PROCESSED_DATA_DIR, "processed_annotations.csv"), index=False)
 
+
+
 if __name__ == "__main__":
-    preprocess_dataset(os.path.join(RAW_DATA_DIR, "Nutrition5kModified.csv"))
+    preprocess_rgb(r"C:\Users\rotem.geva\Desktop\rgb.png", (224, 224))
