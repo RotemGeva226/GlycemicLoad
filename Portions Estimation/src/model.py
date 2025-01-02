@@ -20,6 +20,6 @@ class ResNet101WithRGBandRGBD(nn.Module):
 
     def forward(self, combined_input):
         # Pass the combined input through ResNet
-        out = self.resnet(combined_input)
+        out = self.resnet(combined_input).squeeze(dim=1) # Outputs tensor shape: (batch_size, 1) -> (batch_size)
         return out
 
