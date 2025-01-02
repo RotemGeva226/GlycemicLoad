@@ -13,7 +13,7 @@ REALSENSE_OVERHEAD_PATH = "nutrition5k_dataset/imagery/realsense_overhead/"
 CURRENT_DIR = os.path.dirname(os.getcwd())
 PROCESSED_DATA_DIR = os.path.join(CURRENT_DIR, r"data\processed")
 RAW_DATA_DIR = os.path.join(CURRENT_DIR, r"data\raw")
-INGREDIENTS_METADATA_FILEPATH = os.path.join(CURRENT_DIR, r"data/processed/ingredients.csv")
+INGREDIENTS_METADATA_FILEPATH = os.path.join(CURRENT_DIR, r"data/ingredients.csv")
 
 
 def download_image_from_gcs(bucket_name, source_blob_name, local_temp_path) -> storage.Blob:
@@ -98,16 +98,20 @@ def preprocess_dataset(annotations_file, target_size=(224, 224)):
             torch.save(preprocessed_image_rgb, output_path_rgb)
             torch.save(preprocessed_image_rgbd, output_path_rgbd)
 
+            gl = get_glycemic_load(dish_id)
+
             preprocessed_data.append({
                 "image_id": dish_id,
                 "processed_image_path_rgb": output_path_rgb,
                 "processed_imgae_path_rgbd": output_path_rgbd,
-                "glycemic load": get_glycemic_load(dish_id)
+                "glycemic load": gl
             })
 
         finally:
             if os.path.exists(gcs_image_path_rgb):
                 os.remove(gcs_image_path_rgb)
+            if os.path.exists(gcs_image_path_rgbd):
+                os.remove(gcs_image_path_rgbd)
 
     pd.DataFrame(preprocessed_data).to_csv(os.path.join(PROCESSED_DATA_DIR, "processed_annotations.csv"), index=False)
 
