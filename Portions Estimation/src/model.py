@@ -2,10 +2,24 @@
 import torchvision.models as models
 import torch.nn as nn
 
-def create_resnet101():
-    resnet101 = models.resnet101(pretrained=True)
-    resnet101.conv1 = nn.Conv2d(7, 64, kernel_size=7, stride=2, padding=3, bias=False) # RGB+RGBD (7 channels total)
-    num_features = resnet101.fc.in_features
-    resnet101.fc = nn.Linear(num_features, 1)  # Predict glycemic load
-    return resnet101
+
+class ResNet101WithRGBandRGBD(nn.Module):
+    def __init__(self):
+        super(ResNet101WithRGBandRGBD, self).__init__()
+
+        # Load ResNet101 pretrained model
+        self.resnet = models.resnet101(pretrained=True)
+
+        # Modify the first convolutional layer to accept 7 input channels (3 from RGB, 4 from RGBD)
+        self.resnet.conv1 = nn.Conv2d(7, 64, kernel_size=(3, 3), stride=(2, 2), padding=(3, 3), bias=False)
+
+        self.resnet.fc = nn.Linear(in_features=2048, out_features=1)  # Output glycemic load (single value)
+
+        print(self)
+
+
+    def forward(self, combined_input):
+        # Pass the combined input through ResNet
+        out = self.resnet(combined_input)
+        return out
 
