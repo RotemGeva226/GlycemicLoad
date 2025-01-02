@@ -9,7 +9,7 @@ from tqdm import tqdm
 def train():
     # Hyperparameters
     batch_size = 32
-    num_epochs = 10
+    num_epochs = 3
     learning_rate = 0.001
     csv_file = r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Portions Estimation\data\processed\processed_annotations.csv"
 
