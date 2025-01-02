@@ -35,7 +35,7 @@ def train():
             # Forward pass
             outputs = model(combined_tensor)  # Both inputs are the same tensor
 
-            # Compute loss
+            # Compute loss (predictions, target) # size (batch_size, 1)
             loss = criterion(outputs, glycemic_load)
 
             # Backward pass
@@ -59,7 +59,7 @@ def train():
         val_losses.append(val_loss)
 
     # Plot loss
-    plot_loss_curve(train_loss=losses, val_loss=val_losses)
+    plot_loss_curve(train_loss=losses, val_loss=val_losses, num_epochs=num_epochs)
 
     # Optionally save the trained model
     saving_option = input('Would you like to save the model?')
