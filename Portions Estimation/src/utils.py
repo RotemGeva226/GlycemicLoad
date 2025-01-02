@@ -1,4 +1,5 @@
 # Utility functions (e.g., for saving/loading models, metrics)
+import numpy as np
 from torch.utils.data import Dataset
 import pandas as pd
 import torch
@@ -46,11 +47,13 @@ def get_data_loaders(csv_file, batch_size=32, transform=None, val_size=0.2, test
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     return train_loader, val_loader, test_loader
 
-def plot_loss_curve(train_loss, val_loss, save_path=None):
+def plot_loss_curve(train_loss, val_loss, num_epochs, save_path=None):
     """Plot training and validation loss curves."""
-    plt.plot(train_loss, label="Train Loss")
-    plt.plot(val_loss, label="Validation Loss")
+    x = np.arange(num_epochs)
+    plt.plot(x,train_loss, label="Train Loss")
+    plt.plot(x, val_loss, label="Validation Loss")
     plt.xlabel("Epochs")
+    plt.xticks(x)
     plt.ylabel("Loss")
     plt.legend()
     plt.title("Loss Curve")
