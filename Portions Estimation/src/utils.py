@@ -16,16 +16,12 @@ class MealDataset(Dataset):
 
     def __getitem__(self, idx):
         dish_id = self.data.iloc[idx, 0]
-        rgb_path = self.data.iloc[idx, 1]
-        rgbd_path = self.data.iloc[idx, 2]
-        glycemic_load = self.data.iloc[idx, 3]
+        combined_path = self.data.iloc[idx, 1]
+        glycemic_load = self.data.iloc[idx, 2]
 
         # Load the RGB and RGBD tensors
-        rgb_tensor = torch.load(rgb_path) # Shape: [3, H, W]
-        rgbd_tensor = torch.load(rgbd_path) # Shape: [4, H, W]
+        combined_tensor = torch.load(combined_path) # Shape: [7, H, W]
 
-        # Concatenate RGB and RGBD tensors along the channel dimension
-        combined_tensor = torch.cat((rgb_tensor, rgbd_tensor), dim=0)  # Shape: [7, H, W]
         return combined_tensor, glycemic_load
 
 
@@ -49,7 +45,7 @@ def get_data_loaders(csv_file, batch_size=32, transform=None, val_size=0.2, test
 
 def plot_loss_curve(train_loss, val_loss, num_epochs, save_path=None):
     """Plot training and validation loss curves."""
-    x = np.arange(num_epochs)
+    x = np.arange(1, num_epochs)
     plt.plot(x,train_loss, label="Train Loss")
     plt.plot(x, val_loss, label="Validation Loss")
     plt.xlabel("Epochs")
