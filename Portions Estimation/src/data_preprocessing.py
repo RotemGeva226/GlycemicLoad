@@ -11,7 +11,7 @@ from PIL import Image
 BUCKET_NAME = "nutrition5k_dataset"
 REALSENSE_OVERHEAD_PATH = "nutrition5k_dataset/imagery/realsense_overhead/"
 CURRENT_DIR = os.path.dirname(os.getcwd())
-PROCESSED_DATA_DIR = os.path.join(CURRENT_DIR, r"data\processed")
+PROCESSED_DATA_DIR = os.path.join(CURRENT_DIR, r"data\processed_combined")
 RAW_DATA_DIR = os.path.join(CURRENT_DIR, r"data\raw")
 INGREDIENTS_METADATA_FILEPATH = os.path.join(CURRENT_DIR, r"data/ingredients.csv")
 
@@ -69,11 +69,13 @@ def get_glycemic_load(dish_id):
     return total_gl
 
 
-def preprocess_dataset(annotations_file, target_size=(224, 224)):
+def preprocess_dataset(annotations_file, target_size=(224, 224), mode='split'):
     """
     Preprocess the dataset by temporarily downloading images, processing them, and saving results.
-    :param annotations_file:
-    :param target_size:
+    :param mode: If combined, creates a combined tensor of 7 layers.
+    If split, creates two seperate tensors: rgb (3 layers) and rgbd (4 layers).
+    :param annotations_file: Input file.
+    :param target_size: Size of squeezed image.
     """
     annotations = pd.read_csv(annotations_file, header=None)
     os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
@@ -93,29 +95,42 @@ def preprocess_dataset(annotations_file, target_size=(224, 224)):
             download_image_from_gcs(BUCKET_NAME, gcs_image_path_rgbd, local_temp_path_rgbd)
             preprocessed_image_rgb = preprocess_rgb(local_temp_path_rgb, target_size)
             preprocessed_image_rgbd = preprocess_rgbd(local_temp_path_rgbd, target_size)
-            output_path_rgb = os.path.join(PROCESSED_DATA_DIR, f"rgb_{dish_id}.pt")
-            output_path_rgbd = os.path.join(PROCESSED_DATA_DIR, f"rgbd_{dish_id}.pt")
-            torch.save(preprocessed_image_rgb, output_path_rgb)
-            torch.save(preprocessed_image_rgbd, output_path_rgbd)
 
             gl = get_glycemic_load(dish_id)
 
-            preprocessed_data.append({
-                "image_id": dish_id,
-                "processed_image_path_rgb": output_path_rgb,
-                "processed_imgae_path_rgbd": output_path_rgbd,
-                "glycemic load": gl
-            })
+            match mode:
+                case 'combined':
+                    combined_preprocessed_image = torch.cat((preprocessed_image_rgb, preprocessed_image_rgbd), dim=0)  # Shape: [7, H, W]
+                    output_combined_path = os.path.join(PROCESSED_DATA_DIR, f"combined_{dish_id}.pt")
+                    torch.save(combined_preprocessed_image, output_combined_path)
+                    preprocessed_data.append({
+                        "image_id": dish_id,
+                        "processed_combined_image_path": output_combined_path,
+                        "glycemic load": gl
+                    })
+                case 'split':
+                    output_path_rgb = os.path.join(PROCESSED_DATA_DIR, f"rgb_{dish_id}.pt")
+                    output_path_rgbd = os.path.join(PROCESSED_DATA_DIR, f"rgbd_{dish_id}.pt")
+                    torch.save(preprocessed_image_rgb, output_path_rgb)
+                    torch.save(preprocessed_image_rgbd, output_path_rgbd)
+                    preprocessed_data.append({
+                        "image_id": dish_id,
+                        "processed_image_path_rgb": output_path_rgb,
+                        "processed_imgae_path_rgbd": output_path_rgbd,
+                        "glycemic load": gl
+                    })
 
         finally:
-            if os.path.exists(gcs_image_path_rgb):
-                os.remove(gcs_image_path_rgb)
-            if os.path.exists(gcs_image_path_rgbd):
-                os.remove(gcs_image_path_rgbd)
+            rgb_full_path = os.path.join(os.getcwd(), local_temp_path_rgb)
+            rgbd_full_path = os.path.join(os.getcwd(), local_temp_path_rgbd)
+            if os.path.exists(rgb_full_path):
+                os.remove(rgb_full_path)
+            if os.path.exists(rgbd_full_path):
+                os.remove(rgbd_full_path)
 
-    pd.DataFrame(preprocessed_data).to_csv(os.path.join(PROCESSED_DATA_DIR, "processed_annotations.csv"), index=False)
+    pd.DataFrame(preprocessed_data).to_csv(os.path.join(PROCESSED_DATA_DIR, "processed_combined_annotations.csv"), index=False)
 
 
 
 if __name__ == "__main__":
-    preprocess_dataset(os.path.join(RAW_DATA_DIR, "Nutrition5kModified700.csv"), (224, 224))
+    preprocess_dataset(os.path.join(RAW_DATA_DIR, "Nutrition5kModified700.csv"), (224, 224), mode='combined')
