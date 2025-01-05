@@ -5,6 +5,6 @@ The **Food Classification** project focuses on classifying various types of food
 ## Directory Status
 - `food_classification`: This file includes all the functions utilized for food classification.
 **Note:** It also contains functions related to portion estimation, which were initially tested using LLM.
-- `chatgpt_utils`: Sets up the ChatGPT client and includes functions specific to ChatGPT prompt handling.
-- `calude_utils`: Sets up the Claude client and includes functions specific to Claude prompt handling.
-- `gemini_utils`: Sets up the Gemini client and includes functions specific to Gemini prompt handling.
+- `ChatGPT`: Sets up the ChatGPT client and includes functions specific to ChatGPT prompt handling.
+- `Claude`: Sets up the Claude client and includes functions specific to Claude prompt handling.
+- `Gemini`: Sets up the Gemini client and includes functions specific to Gemini prompt handling.
