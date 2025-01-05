@@ -10,4 +10,4 @@ This directory contains the main source code for the project, including scripts 
 - `model.py`: Defines the architecture of the CNN and fusion model.
 - `utils.py`: Includes helper functions (e.g., for saving/loading models, logging, and evaluation metrics).
 - `train.py`: Script for training the CNN model, including data loading, training loops, and saving weights.
-- `evaluate.py`: Script for evaluating the trained model on validation/test data, including portion size estimation and accuracy calculations.
+- `evaluate.py`: Script for evaluating the trained model on test data.
