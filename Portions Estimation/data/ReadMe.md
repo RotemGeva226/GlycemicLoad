@@ -40,10 +40,7 @@ The dataset is stored in a CSV file with the following columns:
 
 ### Images Data
 ### Processing Steps
-- The preprocessing of the RGB image involves several steps to prepare it for input into a neural network. First, the image is resized to a target size using `transforms.Resize`. Then, it is converted to a tensor representation using `transforms.ToTensor`, which scales pixel values to the range [0, 1]. Finally, the image is normalized using `transforms.Normalize` with specified mean and standard deviation values ([0.485, 0.456, 0.406] for mean and [0.229, 0.224, 0.225] for standard deviation), 
+- The preprocessing of the RGB image involves several steps to prepare it for input into a neural network. First, the image is resized to a target size using `transforms.Resize`. Then, it is converted to a tensor representation using `transforms.ToTensor`, which scales pixel values to the range [0, 1]. Finally, the image is normalized using `transforms.Normalize` with specified mean and standard deviation values 0.0 for mean and 1.0 for standard deviation), 
 aligning it with the normalization used during the pretraining of common CNN models like ResNet. The image is read in RGB format using the `Image.open` method and converted to ensure consistent color channels before applying the transformations.
 
-- The preprocessing for an RGBD image involves separating it into its RGB and depth channels. The RGB channels are merged into a single image using `Image.merge` and processed with a transformation pipeline that resizes the image, converts it to a tensor, 
-and normalizes it using predefined mean and standard deviation values. The depth channel is processed separately with a pipeline that resizes and converts it to a tensor. 
-Finally, the RGB and depth tensors are concatenated along the channel dimension using `torch.cat` to form an RGBD tensor, 
-enabling the model to process both color and depth information simultaneously.
+- The preprocessing of the depth layer was approximately the same. Then, the two were concatenated to a tensor with shape [4, H, W]. 
