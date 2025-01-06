@@ -110,27 +110,12 @@ class Claude:
         print(f'According to Claude, the portion size of {dish_id} is: {portions}')
         return portions
 
-    def estimate_glycemic_load(self, dish_id: str) -> str:
-        """
-        This function outputs the portion of each ingredient that appear in the plate.
-        :param self:
-        :param dish_id: Dish id according to Nutrition5k indexing.
-        :return: The portion size in grams.
-        """
-        blobs = connect_to_nutrition5k(folder_name="nutrition5k_dataset/imagery/realsense_overhead/")
-        for blob in blobs:
-            if blob.name.__contains__(dish_id):
-                if blob.name.__contains__('depth_color.png'):
-                    img_depth: blob = blob
-                elif blob.name.__contains__('rgb.png'):
-                    img_rgb: blob = blob
-                    break
+    def send_prompt(self, prompt, img1, img2):
         image_media_type = "image/png"
-        image_tmp1 = img_rgb.download_as_bytes()
-        image_tmp2 = img_depth.download_as_bytes()
-        image_data1 = base64.b64encode(image_tmp1).decode("utf-8")
-        image_data2 = base64.b64encode(image_tmp2).decode("utf-8")
-        prompt = "Estimate the glycemic load of this meal. Your ENTIRE response must be EXACTLY the estimated glycemic load."
+        img_tmp1 = img1.download_as_bytes()
+        img_tmp2 = img2.download_as_bytes()
+        img1_data = base64.b64encode(img_tmp1).decode("utf-8")
+        img2_data = base64.b64encode(img_tmp2).decode("utf-8")
         message = self._client.messages.create(
             model="claude-3-5-sonnet-20241022",
             max_tokens=1024,
@@ -143,7 +128,7 @@ class Claude:
                             "source": {
                                 "type": "base64",
                                 "media_type": image_media_type,
-                                "data": image_data1
+                                "data": img1_data
                             }
                         },
                         {
@@ -151,7 +136,7 @@ class Claude:
                             "source": {
                                 "type": "base64",
                                 "media_type": image_media_type,
-                                "data": image_data2
+                                "data": img2_data
                             }
                         },
                         {"type": "text", "text": prompt}
@@ -159,13 +144,34 @@ class Claude:
                 }
             ],
         )
-        gl = message.content[0].text
-        print(f'According to Claude, the glycemic load of {dish_id} is: {gl}')
+        answer = message.content[0].text
+        print(f'According to Claude, the answer is: {answer}')
+        return answer
+
+    def estimate_glycemic_load_depth_and_rgb(self, dish_id: str) -> str:
+        """
+        This function outputs the glycemic load of the given dish.
+        The function uses depth and rgb images of the dish to estimate the glycemic load.
+        :param self:
+        :param dish_id: dish id according to Nutrition5k indexing.
+        :return: The glycemic load.
+        """
+        blobs = connect_to_nutrition5k(folder_name="nutrition5k_dataset/imagery/realsense_overhead/")
+        for blob in blobs:
+            if blob.name.__contains__(dish_id):
+                if blob.name.__contains__('depth_color.png'):
+                    img_depth: blob = blob
+                elif blob.name.__contains__('rgb.png'):
+                    img_rgb: blob = blob
+                    break
+        prompt = "Estimate the glycemic load of this meal. Your ENTIRE response must be EXACTLY the estimated glycemic load."
+        gl = self.send_prompt(prompt, img_rgb, img_depth)
         return gl
+
 
 
 
 if __name__ == '__main__':
     claude = Claude()
-    gl = claude.estimate_glycemic_load('dish_1558459115')
+    gl = claude.estimate_glycemic_load_depth_and_rgb('dish_1558459115')
     print(gl)
