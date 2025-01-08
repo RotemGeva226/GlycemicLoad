@@ -1,7 +1,7 @@
 import base64
 import os
-import google
 import google.generativeai as genai
+import google
 
 BASE_DIR = r"C:\Users\rotem\OneDrive - Afeka College Of Engineering\Final Project\Classification"
 GEMINI_API_KEY_FILEPATH = os.path.join(BASE_DIR, "Gemini API Key.txt")
