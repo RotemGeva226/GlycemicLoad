@@ -1,4 +1,6 @@
 # Utility functions (e.g., for saving/loading models, metrics)
+from symtable import Class
+
 import numpy as np
 from torch.utils.data import Dataset
 import pandas as pd
@@ -6,6 +8,8 @@ import torch
 from torch.utils.data import random_split
 import matplotlib.pyplot as plt
 import torchvision.transforms as T
+from model import ResNet34WithRGBandRGBD
+
 
 
 class MealDataset(Dataset):
@@ -32,7 +36,6 @@ class MealDataset(Dataset):
         if self.transform:
             augmented_rgb = self.transform(rgb_tensor)
 
-            # Ensure depth tensor matches RGB transformations
             depth_tensor = self.transform(depth_tensor)
 
         # Combine RGB and depth tensors back
@@ -80,3 +83,34 @@ def plot_loss_curve(train_loss, val_loss, num_epochs, save_path=None):
     if save_path:
         plt.savefig(save_path)
     plt.show()
+
+def save_model(model, model_path, epoch, optimizer, loss):
+    try:
+        torch.save({
+        'epoch': epoch,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'loss': loss}, model_path)
+        print('Model saved successfully.')
+    except Exception as e:
+        print(f'An error occurred while saving the model: {e}')
+
+def load_model(model_path, model_class, optimizer_class, model_args: dict=None, optimizer_args: dict=None):
+    try:
+        model = model_class(**model_args)
+        model.to(torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
+        optimizer = optimizer_class(model.parameters(), **optimizer_args)
+        checkpoint = torch.load(model_path, weights_only=True)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        epoch = checkpoint['epoch']
+        loss = checkpoint['loss']
+        return model, optimizer, epoch, loss
+    except Exception as e:
+        print('An error occurred while loading the model:', e)
+
+if __name__ == "__main__":
+    load_model(
+        model_path=r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Portions Estimation\src\trained_models\Test1.pth",
+        model_class=ResNet34WithRGBandRGBD,
+        model_args={'is_pretrained': False,}, optimizer_class=torch.optim.AdamW, optimizer_args={'lr': 1e-4})
