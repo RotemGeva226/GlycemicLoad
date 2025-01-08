@@ -114,7 +114,7 @@ def estimate_glycemic_load(dishes_metadata: str, output_filename: str, model: Un
     for dish in dishes:
         actual_gl = grouped_dishes.get_group(dish)['Glycemic Load'].sum()
         print(f'Actual glycemic load for dish {dish} is: {actual_gl}')
-        predicted_gl = model.estimate_glycemic_load(dish)
+        predicted_gl = model.estimate_glycemic_load_depth_and_rgb(dish)
         new_data = {'Dish ID': dish, 'Actual Glycemic Load': actual_gl, 'Estimated Glycemic Load': predicted_gl}
         res.loc[len(res)] = new_data
         print(f'There are currently: {len(res)} data points.')
@@ -123,9 +123,9 @@ def estimate_glycemic_load(dishes_metadata: str, output_filename: str, model: Un
 
 
 if __name__ == "__main__":
-    actual = r"C:\Users\rotem.geva\OneDrive - Afeka College Of Engineering\Final Project\Portions Estimation\ingredients.csv"
+    input = r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Food Classification\ClaudeGlycemicLoadEstimationResults.csv"
     claude = Claude.Claude()
-    estimate_glycemic_load(actual, 'ClaudeGlycemicLoadEstimationResults', claude)
+    evaluate(input, 'rmse')
 
 
 
