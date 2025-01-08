@@ -41,11 +41,11 @@ class ResNet50WithRGBandRGBD(nn.Module):
         return out
 
 class ResNet34WithRGBandRGBD(nn.Module):
-    def __init__(self):
+    def __init__(self, is_pretrained):
         super(ResNet34WithRGBandRGBD, self).__init__()
 
         # Load ResNet101 pretrained model
-        self.resnet = models.resnet34(weights=ResNet34_Weights.DEFAULT)
+        self.resnet = models.resnet34(pretrained=is_pretrained)
 
         # Modify the first convolutional layer to accept 7 input channels (3 from RGB, 4 from RGBD)
         self.resnet.conv1 = nn.Conv2d(4, 64, kernel_size=(3, 3), stride=(2, 2), padding=(3, 3), bias=False)
@@ -59,11 +59,11 @@ class ResNet34WithRGBandRGBD(nn.Module):
         return out
 
 class ResNet18WithRGBandRGBD(nn.Module):
-    def __init__(self):
+    def __init__(self, is_pretrained):
         super(ResNet18WithRGBandRGBD, self).__init__()
 
         # Load ResNet101 pretrained model
-        self.resnet = models.resnet18(weights=ResNet18_Weights.DEFAULT)
+        self.resnet = models.resnet18(pretrained=is_pretrained)
 
         # Modify the first convolutional layer to accept 7 input channels (3 from RGB, 4 from RGBD)
         self.resnet.conv1 = nn.Conv2d(4, 64, kernel_size=(3, 3), stride=(2, 2), padding=(3, 3), bias=False)
