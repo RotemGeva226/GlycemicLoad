@@ -1,6 +1,4 @@
 # Utility functions (e.g., for saving/loading models, metrics)
-from symtable import Class
-
 import numpy as np
 from torch.utils.data import Dataset
 import pandas as pd
@@ -95,17 +93,21 @@ def save_model(model, model_path, epoch, optimizer, loss):
     except Exception as e:
         print(f'An error occurred while saving the model: {e}')
 
-def load_model(model_path, model_class, optimizer_class, model_args: dict=None, optimizer_args: dict=None):
+def load_model(model_path, model_class, optimizer_class=None, model_args: dict=None, optimizer_args: dict=None, mode='continue_training'):
     try:
         model = model_class(**model_args)
         model.to(torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
-        optimizer = optimizer_class(model.parameters(), **optimizer_args)
         checkpoint = torch.load(model_path, weights_only=True)
         model.load_state_dict(checkpoint['model_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        epoch = checkpoint['epoch']
-        loss = checkpoint['loss']
-        return model, optimizer, epoch, loss
+        if mode == 'continue_training':
+            optimizer = optimizer_class(model.parameters(), **optimizer_args)
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            epoch = checkpoint['epoch']
+            loss = checkpoint['loss']
+            print('Model loaded successfully.')
+            return model, optimizer, epoch, loss
+        else:
+            return model
     except Exception as e:
         print('An error occurred while loading the model:', e)
 
