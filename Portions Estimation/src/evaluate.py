@@ -3,12 +3,21 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 import matplotlib.pyplot as plt
-from model import ResNet18WithRGBandRGBD
+from model import ResNet50WithRGBandRGBD
 from sklearn.metrics import r2_score, mean_squared_error
 from utils import load_model
 
 
 def evaluate(model, test_loader,experiment_name, loss_fn, device):
+    """
+    This function evaluates the model.
+    :param model: the model to be evaluated.
+    :param test_loader: the test loader, containing the test data.
+    :param experiment_name: the name of the experiment.
+    :param loss_fn: the loss function.
+    :param device: the device, gpu or cpu.
+    :return: mse, avg_loss.
+    """
     writer = SummaryWriter(f"runs-updated/{experiment_name}")
     model.to(device)
     all_true_labels = []
@@ -41,7 +50,6 @@ def evaluate(model, test_loader,experiment_name, loss_fn, device):
     all_predicted_labels = np.array(all_predicted_labels)
 
     # Calculate metrics
-    avg_loss = total_loss / total_samples
     mse = mean_squared_error(all_true_labels, all_predicted_labels)
     r2 = r2_score(all_true_labels, all_predicted_labels)
 
@@ -66,7 +74,7 @@ def evaluate(model, test_loader,experiment_name, loss_fn, device):
     residuals = all_predicted_labels - all_true_labels
     plt.scatter(all_predicted_labels, residuals, alpha=0.6, color="blue")
     plt.axhline(y=0, color="red", linestyle="--")
-    plt.xlabel("Predicted Glycemic Load Values")
+    plt.xlabel("Predicted Values")
     plt.ylabel("Residuals")
     plt.title("Residual Plot")
 
@@ -74,11 +82,17 @@ def evaluate(model, test_loader,experiment_name, loss_fn, device):
     plt.savefig(f"{experiment_name}_regression_plots.png")
     plt.show()
 
-    return mse, avg_loss
+    return mse
 
 
 def plot_evaluation_metrics(true_labels, predicted_labels, experiment_name):
-    # Create figure with multiple subplots
+    """
+    This function plots the evaluation metrics, using mse and r2.
+    :param true_labels: the true labels.
+    :param predicted_labels: the predicted labels.
+    :param experiment_name: the name of the experiment.
+    """
+    # Figure with multiple subplots
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
 
     # Scatter plot of predictions
@@ -105,9 +119,10 @@ def plot_evaluation_metrics(true_labels, predicted_labels, experiment_name):
 
 if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    path = r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Portions Estimation\outputs\models\not_pretrained_resnet18_batch32_lr0.00001\model.pth"
-    trained_model = load_model(path, ResNet18WithRGBandRGBD, None, {'is_pretrained': False}, None, 'else')
-    test_loader = torch.load(r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Portions Estimation\outputs\models\not_pretrained_resnet18_batch32_lr0.00001\train_loader.pt")
-    mse, avg_loss = evaluate(model=trained_model, test_loader=test_loader,
-             experiment_name='untrained_resnet18_batch32_0.00001lr-new2', loss_fn=torch.nn.MSELoss(), device=device)
-    print(f"MSE: {mse:.4f}, Average Loss: {avg_loss:.4f}")
+    path = r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Portions Estimation\outputs\models\not_pretrained_resnet50_batch32_lr0.00001\model.pth"
+    trained_model = load_model(path, ResNet50WithRGBandRGBD, None, {'is_pretrained': False}, None, 'else')
+    test_loader = torch.load(
+        r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad/Portions Estimation/outputs/models/not_pretrained_resnet50_batch32_lr0.00001/test_loader.pt")
+    mse = evaluate(model=trained_model, test_loader=test_loader,
+             experiment_name='not_pretrained_resnet50_batch32_0.00001lr', loss_fn=torch.nn.MSELoss(), device=device)
+    print(f"MSE: {mse:.4f}")
