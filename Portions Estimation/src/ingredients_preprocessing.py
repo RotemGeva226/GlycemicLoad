@@ -71,15 +71,18 @@ def preprocess_ingredients_dataset(annotations_file, metadata_file) -> None:
     for _, row in tqdm(annotations.iterrows(), total=len(annotations)):
         dish_id = row.iloc[0]
         ingredients = extract_ingredients(row, sauces)
-        for ingredient in ingredients:
-            if ingredient in remained_ingredients and ingredient not in sauces:
-                mass = extract_ingredient_content(row, ingredient, mode='mass')
-                carbs = extract_ingredient_content(row, ingredient, mode='carbs')
-                glycemic_index = metadata_filtered[metadata_filtered['ingr'] == ingredient]['Glycemic Index'].iloc[0]
-                glycemic_load = carbs * glycemic_index / 100
-                new_row_data = {'Dish ID': dish_id, 'Ingredient Name': ingredient, "Mass (g)": mass, "Carbs (g)": carbs,
-                                "Glycemic Index": glycemic_index, "Glycemic Load": glycemic_load}
-                res.loc[len(res)] = new_row_data
+        is_all_exist = all(ingredient in remained_ingredients for ingredient in ingredients) # Returns true if all
+        # ingredients exist in remained_ingredients, meaning they all have glycemic indexes.
+        if is_all_exist: # Continue only if all ingredients have glycemic index value in metadata file.
+            for ingredient in ingredients:
+                if ingredient in remained_ingredients and ingredient not in sauces:
+                    mass = extract_ingredient_content(row, ingredient, mode='mass')
+                    carbs = extract_ingredient_content(row, ingredient, mode='carbs')
+                    glycemic_index = metadata_filtered[metadata_filtered['ingr'] == ingredient]['Glycemic Index'].iloc[0]
+                    glycemic_load = carbs * glycemic_index / 100
+                    new_row_data = {'Dish ID': dish_id, 'Ingredient Name': ingredient, "Mass (g)": mass, "Carbs (g)": carbs,
+                                    "Glycemic Index": glycemic_index, "Glycemic Load": glycemic_load}
+                    res.loc[len(res)] = new_row_data
     res.to_csv(os.path.join(os.path.dirname(os.getcwd()), r'data/ingredients-110124.csv'), index=False)
 
 if __name__ == '__main__':
