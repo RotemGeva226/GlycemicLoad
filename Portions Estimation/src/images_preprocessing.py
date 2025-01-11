@@ -6,6 +6,7 @@ import pandas as pd
 from tqdm import tqdm
 import torchvision.transforms as transforms
 from PIL import Image
+import matplotlib.pyplot as plt
 
 BUCKET_NAME = "nutrition5k_dataset"
 REALSENSE_OVERHEAD_PATH = "nutrition5k_dataset/imagery/realsense_overhead/"
@@ -117,7 +118,16 @@ def preprocess_dataset(annotations_file, target_size=(224, 224), mode='split'):
 
     pd.DataFrame(preprocessed_data).to_csv(os.path.join(PROCESSED_DATA_DIR, "processed_annotations.csv"), index=False)
 
-
+def visualize_preprocessed_image(image_tensor):
+    # Convert the Tensor back to NumPy for visualization
+    unnormalized_image = image_tensor.permute(1, 2, 0).numpy()  # Rearrange dimensions to HWC for Matplotlib
+    plt.imshow(unnormalized_image)
+    plt.axis("off")  # Turn off axes for better viewing
+    plt.title("Preprocessed Image")
+    plt.show()
 
 if __name__ == "__main__":
-    preprocess_dataset(os.path.join(RAW_DATA_DIR, "Nutrition5kModified700.csv"), (224, 224), mode='combined')
+    # preprocess_dataset(os.path.join(RAW_DATA_DIR, "Nutrition5kModified700.csv"), (224, 224), mode='combined')
+    image_path = r"C:\Users\rotem.geva\Desktop\temp_image_rgb.jpg"
+    image_tensor = preprocess_rgb(image_path)
+    visualize_preprocessed_image(image_tensor)
