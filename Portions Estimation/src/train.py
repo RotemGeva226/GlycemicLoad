@@ -1,7 +1,7 @@
 # Script to train the models
 import torch
 import torch.nn as nn
-from model import ResNet34WithRGBandRGBD, ResNet18WithRGBandRGBD
+from model import ResNet34WithRGBandRGBD, ResNet50WithRGBandRGBD
 from utils import get_data_loaders, save_model, load_model
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
@@ -9,6 +9,15 @@ from torch.utils.tensorboard import SummaryWriter
 
 
 def train(model, experiment_name, batch_size, num_epochs, learning_rate, weight_decay):
+    """
+    This function trains the model.
+    :param model: the model to be trained.
+    :param experiment_name: the name of the experiment.
+    :param batch_size: the batch size.
+    :param num_epochs: the number of epochs.
+    :param learning_rate: the learning rate.
+    :param weight_decay: the weight decay.
+    """
     # Initialize general
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     writer = SummaryWriter(f"runs-updated/{experiment_name}")
@@ -67,6 +76,16 @@ def train(model, experiment_name, batch_size, num_epochs, learning_rate, weight_
     writer.close()
 
 def continue_train(model, experiment_name, batch_size, num_epochs, epochs, loss, optimizer):
+    """
+    This function trains the model from a certain epoch.
+    :param model: the model to be trained.
+    :param experiment_name: the name of the experiment.
+    :param batch_size: the batch size.
+    :param num_epochs: the number of epochs.
+    :param epochs: the number of epochs that have already been trained.
+    :param loss: the loss.
+    :param optimizer: the optimizer.
+    """
     # Initialize general
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     writer = SummaryWriter(f"runs-updated/{experiment_name}")
