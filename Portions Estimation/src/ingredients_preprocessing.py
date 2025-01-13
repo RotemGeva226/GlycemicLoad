@@ -75,7 +75,7 @@ def preprocess_ingredients_dataset(annotations_file, metadata_file) -> None:
         # ingredients exist in remained_ingredients, meaning they all have glycemic indexes.
         if is_all_exist: # Continue only if all ingredients have glycemic index value in metadata file.
             for ingredient in ingredients:
-                if ingredient in remained_ingredients and ingredient not in sauces:
+                if ingredient not in sauces:
                     mass = extract_ingredient_content(row, ingredient, mode='mass')
                     carbs = extract_ingredient_content(row, ingredient, mode='carbs')
                     glycemic_index = metadata_filtered[metadata_filtered['ingr'] == ingredient]['Glycemic Index'].iloc[0]
@@ -83,13 +83,34 @@ def preprocess_ingredients_dataset(annotations_file, metadata_file) -> None:
                     new_row_data = {'Dish ID': dish_id, 'Ingredient Name': ingredient, "Mass (g)": mass, "Carbs (g)": carbs,
                                     "Glycemic Index": glycemic_index, "Glycemic Load": glycemic_load}
                     res.loc[len(res)] = new_row_data
-    res.to_csv(os.path.join(os.path.dirname(os.getcwd()), r'data/ingredients-110124.csv'), index=False)
+    res.to_csv(os.path.join(os.path.dirname(os.getcwd()), r'data/ingredients-130124.csv'), index=False)
+
+def classify_ingredients(input_filepath: str):
+    """
+    Adds column "Class" to the input file, according to glycemic load of the dish.
+    If the dish if below 10, the class is 1, if between 11 and 19, the class is 2, and if above 20, the class is 3.
+    :param input_filepath: A path to the input file.
+    """
+    df = pd.read_csv(input_filepath)
+    grouped_dishes = df.groupby('Dish ID')
+    for group in grouped_dishes.groups:
+        gl = grouped_dishes.get_group(group)['Glycemic Load'].sum()
+        if gl <= 10:
+            df.loc[df['Dish ID'] == group, 'Class'] = 1
+        elif 10 < gl <= 19:
+            df.loc[df['Dish ID'] == group, 'Class'] = 2
+        elif gl > 19:
+            df.loc[df['Dish ID'] == group, 'Class'] = 3
+    df.to_csv(input_filepath, index=False)
+
 
 if __name__ == '__main__':
     dirname = os.path.dirname(os.getcwd())
-    input_filepath = os.path.join(dirname, r"data/raw/nutrition5k_dataset_metadata_dish_metadata_cafe1.csv")
-    sauces_filepath = os.path.join(dirname, r"data/raw/nutrition5k_dataset_metadata_ingredients_metadata.csv")
-    preprocess_ingredients_dataset(input_filepath, sauces_filepath)
+    # input_filepath = os.path.join(dirname, r"data/raw/nutrition5k_dataset_metadata_dish_metadata_cafe1.csv")
+    # sauces_filepath = os.path.join(dirname, r"data/raw/nutrition5k_dataset_metadata_ingredients_metadata.csv")
+    # preprocess_ingredients_dataset(input_filepath, sauces_filepath)
+    input_filepath = os.path.join(dirname, r"data/ingredients-130124.csv")
+    classify_ingredients(input_filepath)
 
 
 
