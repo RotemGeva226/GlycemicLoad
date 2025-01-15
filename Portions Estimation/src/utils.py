@@ -6,7 +6,8 @@ import torch
 from torch.utils.data import random_split
 import matplotlib.pyplot as plt
 import torchvision.transforms as T
-from model import ResNet34WithRGBandRGBD
+from model_regression import ResNet34WithRGBandRGBD
+from torch.utils.data.sampler import WeightedRandomSampler
 
 
 
@@ -41,15 +42,33 @@ class MealDataset(Dataset):
 
         return combined_tensor, glycemic_load
 
+class MealDatasetClassification(Dataset):
+    def __init__(self, csv_file, transform=None):
+        self.data = pd.read_csv(csv_file)
+        self.transform = transform
 
-def get_data_loaders(csv_file, batch_size=32, val_size=0.2, test_size=0.2):
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        dish_id = self.data.iloc[idx, 0]
+        input_path = self.data.iloc[idx, 1]
+        classification = self.data.iloc[idx, 2]
+
+        # Load the RGB tensor
+        rgb_tensor = torch.load(input_path)
+
+        return rgb_tensor, classification
+
+
+def get_data_loaders(dataset_class, dataset_args=None, batch_size=32, val_size=0.2, test_size=0.2):
     transform = T.Compose([
         T.RandomHorizontalFlip(p=0.5),
         T.RandomRotation(degrees=15),
         T.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1), # Expects [1 or 3, H , W]
     ])
 
-    dataset = MealDataset(csv_file=csv_file, transform=transform)
+    dataset = dataset_class(**dataset_args)
 
     # Split proportions
     total_size = len(dataset)
@@ -113,6 +132,6 @@ def load_model(model_path, model_class, optimizer_class=None, model_args: dict=N
 
 if __name__ == "__main__":
     load_model(
-        model_path=r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Portions Estimation\src\trained_models\Test1.pth",
+        model_path=r"/Portions Estimation/src/trained_models_regression\Test1.pth",
         model_class=ResNet34WithRGBandRGBD,
         model_args={'is_pretrained': False,}, optimizer_class=torch.optim.AdamW, optimizer_args={'lr': 1e-4})
