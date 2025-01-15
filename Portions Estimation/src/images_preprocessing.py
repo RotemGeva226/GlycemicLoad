@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 BUCKET_NAME = "nutrition5k_dataset"
 REALSENSE_OVERHEAD_PATH = "nutrition5k_dataset/imagery/realsense_overhead/"
 CURRENT_DIR = os.path.dirname(os.getcwd())
-PROCESSED_DATA_DIR = os.path.join(CURRENT_DIR, r"data\processed")
+PROCESSED_DATA_DIR = os.path.join(CURRENT_DIR, r"data\rgb_processed_imagenet")
 RAW_DATA_DIR = os.path.join(CURRENT_DIR, r"data\raw")
 INGREDIENTS_METADATA_FILEPATH = os.path.join(CURRENT_DIR, r"data/ingredients.csv")
 
@@ -34,8 +34,8 @@ def preprocess_rgb(image_path, target_size=(224, 224)) -> torch.Tensor:
     transform = transforms.Compose([
         transforms.Resize(target_size),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.0, 0.0, 0.0],
-                             std=[1.0, 1.0, 1.0])
+        transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                             std=[0.229, 0.224, 0.225])
     ])
     image = Image.open(image_path).convert("RGB")
     return transform(image)
@@ -50,19 +50,17 @@ def preprocess_rgbd(image_path, target_size=(224, 224)) -> torch.Tensor:
     depth_tensor = depth_transform(depth_image)
     return depth_tensor
 
-
 def get_glycemic_load(dish_id):
     ingredients_metadata_df = pd.read_csv(INGREDIENTS_METADATA_FILEPATH)
     total_gl = ingredients_metadata_df.groupby("Dish ID").get_group(dish_id)['Glycemic Load'].sum()
     return total_gl
 
-
-def preprocess_dataset(annotations_file, target_size=(224, 224), mode='split'):
+def preprocess_dataset_nutrition5k_format(annotations_file, target_size=(224, 224), mode='split'):
     """
     Preprocess the dataset by temporarily downloading images, processing them, and saving results.
     :param mode: If combined, creates a combined tensor of 7 layers.
     If split, creates two seperate tensors: rgb (3 layers) and rgbd (4 layers).
-    :param annotations_file: Input file.
+    :param annotations_file: Input file like in Nutrition5k dataset.
     :param target_size: Size of squeezed image.
     """
     annotations = pd.read_csv(annotations_file, header=None)
@@ -107,7 +105,6 @@ def preprocess_dataset(annotations_file, target_size=(224, 224), mode='split'):
                         "processed_path_depth_tensor": output_path_depth,
                         "glycemic load": gl
                     })
-
         finally:
             rgb_full_path = os.path.join(os.getcwd(), local_temp_path_rgb)
             depth_full_path = os.path.join(os.getcwd(), local_temp_path_depth)
@@ -118,16 +115,57 @@ def preprocess_dataset(annotations_file, target_size=(224, 224), mode='split'):
 
     pd.DataFrame(preprocessed_data).to_csv(os.path.join(PROCESSED_DATA_DIR, "processed_annotations.csv"), index=False)
 
+def preprocess_dataset(annotations_file, target_size=(224, 224)) -> None:
+    """
+    Preprocess the dataset by temporarily downloading images, processing them, and saving results.
+    :param annotations_file: Input file in format of: Dish ID,Ingredient Name,Mass (g),Carbs (g),Glycemic Index,Glycemic Load,Class.
+    :param target_size: Size of squeezed image.
+    """
+    annotations = pd.read_csv(annotations_file)
+    os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
+
+    preprocessed_data = []
+
+    grouped_dishes = annotations.groupby("Dish ID")
+
+    for group in tqdm(grouped_dishes.groups, total=len(grouped_dishes.groups)):
+        dish_id = group
+        gcs_image_path_rgb = f"{REALSENSE_OVERHEAD_PATH}{dish_id}/rgb.png"
+        local_temp_path_rgb = "temp_image_rgb.jpg"
+
+        # Downloading the image and appending new info
+        try:
+            download_image_from_gcs(BUCKET_NAME, gcs_image_path_rgb, local_temp_path_rgb)
+            preprocessed_rgb_tensor = preprocess_rgb(local_temp_path_rgb, target_size)
+            output_path_rgb = os.path.join(PROCESSED_DATA_DIR, f"rgb_{dish_id}.pt")
+            torch.save(preprocessed_rgb_tensor, output_path_rgb)
+            classification = grouped_dishes.get_group(dish_id)['Class'].tolist()[0]
+            preprocessed_data.append({
+                "image_id": dish_id,
+                "processed_path_rgb_tensor": output_path_rgb,
+                "class": classification
+            })
+        except Exception as e:
+            print(f"Error processing dish {dish_id}: {e}")
+
+        finally:
+            rgb_full_path = os.path.join(os.getcwd(), local_temp_path_rgb)
+            if os.path.exists(rgb_full_path):
+                os.remove(rgb_full_path)
+
+    pd.DataFrame(preprocessed_data).to_csv(os.path.join(PROCESSED_DATA_DIR, "processed_annotations.csv"), index=False)
+
 def visualize_preprocessed_image(image_tensor):
     # Convert the Tensor back to NumPy for visualization
-    unnormalized_image = image_tensor.permute(1, 2, 0).numpy()  # Rearrange dimensions to HWC for Matplotlib
+    unnormalized_image = image_tensor.permute(1, 2, 0).numpy()
     plt.imshow(unnormalized_image)
     plt.axis("off")  # Turn off axes for better viewing
     plt.title("Preprocessed Image")
     plt.show()
 
 if __name__ == "__main__":
-    # preprocess_dataset(os.path.join(RAW_DATA_DIR, "Nutrition5kModified700.csv"), (224, 224), mode='combined')
-    image_path = r"C:\Users\rotem.geva\Desktop\temp_image_rgb.jpg"
-    image_tensor = preprocess_rgb(image_path)
-    visualize_preprocessed_image(image_tensor)
+    path = r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Portions Estimation\data\ingredients\ingredients-classification-full.csv"
+    preprocess_dataset(path, (224, 224))
+    # image_path = r"C:\Users\rotem.geva\Desktop\temp_image_rgb.jpg"
+    # image_tensor = preprocess_rgb(image_path)
+    # visualize_preprocessed_image(image_tensor)
