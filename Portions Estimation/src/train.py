@@ -1,7 +1,7 @@
 # Script to train the models
 import torch
 import torch.nn as nn
-from model_classification import ResNet18
+from model_classification import ResNet18, ResNet34
 from utils import get_data_loaders, save_model, MealDatasetClassification
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
@@ -158,11 +158,8 @@ def train_classification(model, experiment_name, batch_size, num_epochs, learnin
     model.to(device)
 
     # Prepare data
-    train_loader, val_loader, test_loader = get_data_loaders(dataset_class=MealDatasetClassification, dataset_args={"csv_file": csv_file})
-    torch.save(test_loader, f"trained_models/tl-{experiment_name}.pt")
-    class_counts = torch.tensor([250, 250, 173])
-    class_weights = 1. / class_counts
-    class_weights /= class_weights.sum()
+    train_loader, val_loader, test_loader = get_data_loaders(dataset_class=MealDatasetClassification, batch_size=batch_size, dataset_args={"csv_file": csv_file})
+    torch.save(test_loader, f"trained_models_classification/tl-{experiment_name}.pt")
 
     # Loss and optimizer
     criterion = nn.CrossEntropyLoss() # use cross entropy for multi class classification
@@ -173,17 +170,18 @@ def train_classification(model, experiment_name, batch_size, num_epochs, learnin
         model.train()  # Set the model to training mode
         for input_tensor, classification in train_loader:
             input_tensor = input_tensor.float().to(device)
-            classification = classification.float().to(device)
+            classification = classification.to(device)
 
             # Forward pass
-            outputs = model(input_tensor)  # Both inputs are the same tensor
+            outputs = model(input_tensor)
 
-            # Compute loss (predictions, target) # size (batch_size, 1)
+            # Compute loss (predictions, target)
             loss = criterion(outputs, classification)
 
             # Backward pass
             optimizer.zero_grad()
             loss.backward()
+            torch.nn.utils.clip_grad_norm(model.parameters(), max_norm=1.0)
             optimizer.step()
 
         # Validation loop
@@ -197,7 +195,7 @@ def train_classification(model, experiment_name, batch_size, num_epochs, learnin
             total = 0
             for input_tensor, classification in val_loader:
                 input_tensor = input_tensor.float().to(device)
-                classification = classification.long().to(device)
+                classification = classification.to(device)
 
                 outputs = model(input_tensor)
                 val_loss += criterion(outputs, classification).item()
@@ -229,7 +227,5 @@ def train_classification(model, experiment_name, batch_size, num_epochs, learnin
     save_model(model, f"trained_models_classification/{experiment_name}.pth", num_epochs, optimizer, loss)
     writer.close()
 
-
-
 if __name__ == "__main__":
-    train_classification(ResNet18(num_classes=3), 'resnet18_batch32_0.0001lr',batch_size=32, num_epochs=1000, learning_rate=0.0001, weight_decay=0.0)
+    train_classification(ResNet34(num_classes=3), 'resnet34_batch32_0.00001lr',batch_size=32, num_epochs=1000, learning_rate=0.00001, weight_decay=0.0)
