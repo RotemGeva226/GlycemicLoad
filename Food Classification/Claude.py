@@ -3,7 +3,6 @@ import anthropic
 import os
 import google
 from google.cloud import storage
-from utils import connect_to_nutrition5k
 
 BASE_DIR = r"C:\Users\rotem.geva\OneDrive - Afeka College Of Engineering\Final Project\Classification"
 CLAUDE_API_KEY_FILEPATH = os.path.join(BASE_DIR, "Claude API Key.txt")
@@ -110,7 +109,7 @@ class Claude:
         print(f'According to Claude, the portion size of {dish_id} is: {portions}')
         return portions
 
-    def send_prompt(self, prompt, img1, img2):
+    def send_prompt_two_images(self, prompt, img1, img2):
         image_media_type = "image/png"
         img_tmp1 = img1.download_as_bytes()
         img_tmp2 = img2.download_as_bytes()
@@ -148,6 +147,34 @@ class Claude:
         print(f'According to Claude, the answer is: {answer}')
         return answer
 
+    def send_prompt_single_image(self, prompt, img1):
+        image_media_type = "image/png"
+        img_tmp1 = img1.download_as_bytes()
+        img1_data = base64.b64encode(img_tmp1).decode("utf-8")
+        message = self._client.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=1024,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": image_media_type,
+                                "data": img1_data
+                            }
+                        },
+                        {"type": "text", "text": prompt}
+                    ],
+                }
+            ],
+        )
+        answer = message.content[0].text
+        print(f'According to Claude, the answer is: {answer}')
+        return answer
+
     def estimate_glycemic_load_depth_and_rgb(self, dish_id: str) -> str:
         """
         This function outputs the glycemic load of the given dish.
@@ -168,10 +195,33 @@ class Claude:
         gl = self.send_prompt(prompt, img_rgb, img_depth)
         return gl
 
+    def classify_dish(self, dish_id: str) -> str:
+        """
+        This function outputs the glycemic load classification of the given dish (low, medium, high)
+        The function uses only rgb images of the dish to predict the group.
+        :param dish_id: dish id according to Nutrition5k indexing.
+        :return: The glycemic load classification.
+        """
+        blobs = connect_to_nutrition5k(folder_name="nutrition5k_dataset/imagery/realsense_overhead/")
+        for blob in blobs:
+            if blob.name.__contains__(dish_id):
+                if blob.name.__contains__('rgb.png'):
+                    img_rgb: blob = blob
+                    break
+        prompt = ("You are a nutritionist. Estimate the glycemic load of this meal. Your ENTIRE response must be "
+                  "EXACTLY low, medium or high")
+        gl_classification = self.send_prompt_single_image(prompt, img_rgb)
+        return gl_classification
 
-
+def connect_to_nutrition5k(folder_name: str) -> google.cloud.storage.blob:
+    BUCKET_NAME = "nutrition5k_dataset"
+    storage_client = storage.Client.create_anonymous_client()
+    bucket = storage_client.bucket(BUCKET_NAME)
+    blobs = bucket.list_blobs(prefix=folder_name)
+    # folder name e.g. "nutrition5k_dataset/imagery/realsense_overhead/"
+    return blobs
 
 if __name__ == '__main__':
     claude = Claude()
-    gl = claude.estimate_glycemic_load_depth_and_rgb('dish_1558459115')
-    print(gl)
+    classification = claude.classify_dish('dish_1558459115')
+    print(classification)
