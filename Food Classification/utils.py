@@ -1,4 +1,8 @@
 import google
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+import matplotlib.pyplot as plt
+from tqdm import tqdm
+
 import Claude, Gemini, ChatGPT
 import pandas as pd
 from google.cloud import storage
@@ -121,11 +125,45 @@ def estimate_glycemic_load(dishes_metadata: str, output_filename: str, model: Un
 
     res.to_csv(f'{output_filename}.csv', index=False)
 
+def classify_glycemic_load(gt_path: str, output_filename: str, model: Union[Claude, Gemini, ChatGPT]) -> None:
+    """
+    This function calculates glycemic load estimation.
+    :param gt_path: A csv file with dish id and class.
+    :param output_filename: Name for the output csv file.
+    :param model: The model used to estimate glycemic load.
+    """
+    gt = pd.read_csv(gt_path)
+    res = pd.DataFrame(columns=['Dish ID', 'Actual Glycemic Load Class', 'Estimated Glycemic Load Class'])
+    y_true = []
+    y_pred = []
+    for row in tqdm(gt.iterrows(), total=len(gt), desc="Classifying dishes"):
+        dish_id = row[1]['image_id']
+        classified_gl = row[1]['class']
+        estimated_gl = model.classify_dish(dish_id)
+        match estimated_gl.lower():
+            case 'low':
+                estimated_gl = 0
+            case 'medium':
+                estimated_gl = 1
+            case 'high':
+                estimated_gl = 2
+        new_data = {'Dish ID': dish_id, 'Actual Glycemic Load': classified_gl, 'Estimated Glycemic Load': estimated_gl}
+        res.loc[len(res)] = new_data
+        y_true.append(classified_gl)
+        y_pred.append(estimated_gl)
+    res.to_csv('ClaudeGLlassificationResults.csv', index=False)
+    cm = confusion_matrix(y_true, y_pred)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+    disp.plot(cmap="viridis", values_format="d")
+    plt.title(f"Confusion Matrix - Claude")
+    plt.savefig("claude_confusion_matrix.png")
+    plt.show()
+
 
 if __name__ == "__main__":
-    input = r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Food Classification\ClaudeGlycemicLoadEstimationResults.csv"
+    input = r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Portions Estimation\data\rgb_processed_imagenet\processed_annotations.csv"
     claude = Claude.Claude()
-    evaluate(input, 'rmse')
+    classify_glycemic_load(input, 'ClaudeGlycemicLoadClassificationResults', claude)
 
 
 
