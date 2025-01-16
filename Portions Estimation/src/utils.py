@@ -58,16 +58,10 @@ class MealDatasetClassification(Dataset):
         # Load the RGB tensor
         rgb_tensor = torch.load(input_path)
 
-        return rgb_tensor, classification
+        return rgb_tensor, classification, dish_id
 
 
 def get_data_loaders(dataset_class, dataset_args=None, batch_size=32, val_size=0.2, test_size=0.2):
-    transform = T.Compose([
-        T.RandomHorizontalFlip(p=0.5),
-        T.RandomRotation(degrees=15),
-        T.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1), # Expects [1 or 3, H , W]
-    ])
-
     dataset = dataset_class(**dataset_args)
 
     # Split proportions
@@ -79,8 +73,18 @@ def get_data_loaders(dataset_class, dataset_args=None, batch_size=32, val_size=0
     # Perform the split
     train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size])
 
+    # Calculate targets for the training set only
+    train_targets = [train_dataset[i][1] for i in range(len(train_dataset))]
+    class_counts = [250, 266, 172]  # Counts for each class
+    class_weights = 1. / torch.tensor(class_counts, dtype=torch.float)
+    train_sample_weights = [class_weights[t] for t in train_targets]
+    # Replacement = True, allows samples to be picked more than once in an epoch
+
+    sampler = WeightedRandomSampler(weights=train_sample_weights, num_samples=len(train_sample_weights), replacement=True)
+
+
     # Create DataLoaders
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, sampler=sampler, num_workers=4, pin_memory=True)
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     return train_loader, val_loader, test_loader
