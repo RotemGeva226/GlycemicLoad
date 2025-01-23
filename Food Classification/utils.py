@@ -102,6 +102,10 @@ def evaluate(input_filepath: str, mode: str):
             rss = ((df[actual_column_name] - df[estimated_column_name]) ** 2).sum()
             r_squared = 1 - (rss / tss)
             print(f'The R-squared is: {round(r_squared, 2)}')
+        case 'mse':
+            mse = np.mean((df[actual_column_name] - df[estimated_column_name]) ** 2)
+            print("Mean Squared Error (MSE):", mse)
+
 
 def estimate_glycemic_load(dishes_metadata: str, output_filename: str, model: Union[Claude, Gemini, ChatGPT]) -> None:
     """
@@ -161,9 +165,8 @@ def classify_glycemic_load(gt_path: str, output_filename: str, model: Union[Clau
 
 
 if __name__ == "__main__":
-    input = r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Portions Estimation\data\rgb_processed_imagenet\processed_annotations.csv"
-    claude = Claude.Claude()
-    classify_glycemic_load(input, 'ClaudeGlycemicLoadClassificationResults', claude)
+    input = r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Food Classification\ClaudeGlycemicLoadEstimationResults.csv"
+    evaluate(input, 'mse')
 
 
 
