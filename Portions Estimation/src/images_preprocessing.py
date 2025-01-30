@@ -115,6 +115,45 @@ def preprocess_dataset_nutrition5k_format(annotations_file, target_size=(224, 22
 
     pd.DataFrame(preprocessed_data).to_csv(os.path.join(PROCESSED_DATA_DIR, "processed_annotations.csv"), index=False)
 
+def preprocess_dataset_portions_classification(annotations_file, target_size=(224, 224)):
+    """
+    Preprocess the dataset by temporarily downloading images, processing them, and saving results.
+    :param annotations_file: Input file: dish_id, dominate_ingredient, total_mass, mass_class
+    :param target_size: Size of squeezed image.
+    """
+    annotations = pd.read_csv(annotations_file)
+    os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
+
+    preprocessed_data = []
+
+    for _, row in tqdm(annotations.iterrows(), total=len(annotations)):
+        dish_id = row.iloc[0]
+        mass_class = row.iloc[3]
+        gcs_image_path_rgb = f"{REALSENSE_OVERHEAD_PATH}{dish_id}/rgb.png"
+        local_temp_path_rgb = "temp_image_rgb.jpg"
+
+        # Downloading the image and appending new info
+        try:
+            download_image_from_gcs(BUCKET_NAME, gcs_image_path_rgb, local_temp_path_rgb)
+            preprocessed_rgb_tensor = preprocess_rgb(local_temp_path_rgb, target_size)
+
+            output_combined_path = os.path.join(PROCESSED_DATA_DIR, f"{dish_id}.pt")
+            torch.save(preprocessed_rgb_tensor, output_combined_path)
+            preprocessed_data.append({
+                "image_id": dish_id,
+                "processed_image_path": output_combined_path,
+                "class": mass_class
+            })
+        except Exception as e:
+            pass
+
+        finally:
+            rgb_full_path = os.path.join(os.getcwd(), local_temp_path_rgb)
+            if os.path.exists(rgb_full_path):
+                os.remove(rgb_full_path)
+
+    pd.DataFrame(preprocessed_data).to_csv(os.path.join(PROCESSED_DATA_DIR, "processed_portions_classification.csv"), index=False)
+
 def preprocess_dataset(annotations_file, target_size=(224, 224)) -> None:
     """
     Preprocess the dataset by temporarily downloading images, processing them, and saving results.
@@ -164,8 +203,5 @@ def visualize_preprocessed_image(image_tensor):
     plt.show()
 
 if __name__ == "__main__":
-    path = r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Portions Estimation\data\ingredients\ingredients-classification-full.csv"
-    preprocess_dataset(path, (224, 224))
-    # image_path = r"C:\Users\rotem.geva\Desktop\temp_image_rgb.jpg"
-    # image_tensor = preprocess_rgb(image_path)
-    # visualize_preprocessed_image(image_tensor)
+    path = r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Portions Estimation\data\raw\processed_portions_classification.csv"
+    preprocess_dataset_portions_classification(path, (224, 224))
