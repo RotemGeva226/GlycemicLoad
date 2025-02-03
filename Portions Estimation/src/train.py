@@ -7,7 +7,6 @@ from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
-
 def train_regression(model, experiment_name, batch_size, num_epochs, learning_rate, weight_decay):
     """
     This function trains the model.
@@ -20,7 +19,7 @@ def train_regression(model, experiment_name, batch_size, num_epochs, learning_ra
     """
     # Initialize general
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    writer = SummaryWriter(f"runs-updated/{experiment_name}")
+    writer = SummaryWriter(f"runs-regression/{experiment_name}")
     model.to(device)
     csv_file = r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Portions Estimation\data\processed\processed_annotations.csv"
 
@@ -141,9 +140,10 @@ def continue_train(model, experiment_name, batch_size, num_epochs, epochs, loss,
         save_model(model, f"trained_models/{experiment_name}.pth", num_epochs, optimizer, loss)
     writer.close()
 
-def train_classification(model, experiment_name, batch_size, num_epochs, learning_rate, weight_decay):
+def train_classification(csv_file, model, experiment_name, batch_size, num_epochs, learning_rate, weight_decay):
     """
     This function trains the model.
+    :param csv_file: the file that contains dataset content.
     :param model: the model to be trained.
     :param experiment_name: the name of the experiment.
     :param batch_size: the batch size.
@@ -152,18 +152,20 @@ def train_classification(model, experiment_name, batch_size, num_epochs, learnin
     :param weight_decay: the weight decay.
     """
     # Initialize general
-    csv_file = r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Portions Estimation\data\rgb_processed_imagenet\processed_annotations.csv"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     writer = SummaryWriter(f"runs-classification/{experiment_name}")
     model.to(device)
 
     # Prepare data
-    train_loader, val_loader, test_loader = get_data_loaders(dataset_class=MealDatasetClassification, batch_size=batch_size, dataset_args={"csv_file": csv_file})
-    torch.save(test_loader, f"trained_models_classification/tl-{experiment_name}.pt")
+    train_loader, val_loader, test_loader, class_weights = get_data_loaders(dataset_class=MealDatasetClassification,
+                                                                            batch_size=batch_size,
+                                                                            dataset_args={"csv_file": csv_file})
+    torch.save(test_loader, f"models/trained_models_classification/tl-{experiment_name}.pt")
 
     # Loss and optimizer
-    criterion = nn.CrossEntropyLoss() # use cross entropy for multi class classification
+    criterion = nn.CrossEntropyLoss(weight=class_weights.to(device)) # use cross entropy for multi class classification
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+
 
     # Training loop
     for epoch in tqdm(range(num_epochs), desc="Training Epochs"):
@@ -181,7 +183,6 @@ def train_classification(model, experiment_name, batch_size, num_epochs, learnin
             # Backward pass
             optimizer.zero_grad()
             loss.backward()
-            torch.nn.utils.clip_grad_norm(model.parameters(), max_norm=1.0)
             optimizer.step()
 
         # Validation loop
@@ -228,4 +229,5 @@ def train_classification(model, experiment_name, batch_size, num_epochs, learnin
     writer.close()
 
 if __name__ == "__main__":
-    train_classification(ResNet34(num_classes=3), 'resnet34_batch32_0.00001lr',batch_size=32, num_epochs=1000, learning_rate=0.00001, weight_decay=0.0)
+    csv_filepath = r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Portions Estimation\data\processed_portions_classification\processed_portions_classification.csv"
+    train_classification(csv_filepath, ResNet34(num_classes=3), 'portions_resnet34_batch32_0.00001lr',batch_size=32, num_epochs=1000, learning_rate=0.00001, weight_decay=0.0)
