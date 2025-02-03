@@ -30,12 +30,20 @@ def download_image_from_gcs(bucket_name, source_blob_name, local_temp_path) -> s
     blob.download_to_filename(local_temp_path)
     return local_temp_path
 
-def preprocess_rgb(image_path, target_size=(224, 224)) -> torch.Tensor:
+def preprocess_rgb(image_path, target_size=(224, 224),  use_imagenet=True) -> torch.Tensor:
+    mean_imagenet = [0.485, 0.456, 0.406]
+    std_imagenet = [0.229, 0.224, 0.225]
+    mean_strand = [0.0,0.0,0.0]
+    std_strand = [1.0,1.0,1.0]
+
+    if use_imagenet:
+        mean, std = mean_imagenet, std_imagenet
+    else:
+        mean, std = mean_strand, std_strand
     transform = transforms.Compose([
         transforms.Resize(target_size),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                             std=[0.229, 0.224, 0.225])
+        transforms.Normalize(mean=mean, std=std)
     ])
     image = Image.open(image_path).convert("RGB")
     return transform(image)
@@ -157,8 +165,10 @@ def preprocess_dataset_portions_classification(annotations_file, target_size=(22
 def preprocess_dataset(annotations_file, target_size=(224, 224)) -> None:
     """
     Preprocess the dataset by temporarily downloading images, processing them, and saving results.
-    :param annotations_file: Input file in format of: Dish ID,Ingredient Name,Mass (g),Carbs (g),Glycemic Index,Glycemic Load,Class.
+    :param annotations_file: Input file in format of: Dish ID,Ingredient Name,Mass (g),Carbs (g),Glycemic Index,
+    Glycemic Load and Class.
     :param target_size: Size of squeezed image.
+    This is only for processing rgb images!
     """
     annotations = pd.read_csv(annotations_file)
     os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
@@ -203,5 +213,5 @@ def visualize_preprocessed_image(image_tensor):
     plt.show()
 
 if __name__ == "__main__":
-    path = r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Portions Estimation\data\raw\processed_portions_classification.csv"
+    path = r"/Portions Estimation/data/ready_for_train/processed_portions_classification.csv"
     preprocess_dataset_portions_classification(path, (224, 224))
