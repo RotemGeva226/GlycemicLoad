@@ -1,4 +1,6 @@
 # Utility functions (e.g., for saving/loading models, metrics)
+from collections import Counter
+
 import numpy as np
 from torch.utils.data import Dataset
 import pandas as pd
@@ -58,8 +60,7 @@ class MealDatasetClassification(Dataset):
         # Load the RGB tensor
         rgb_tensor = torch.load(input_path)
 
-        return rgb_tensor, classification, dish_id
-
+        return rgb_tensor, classification
 
 def get_data_loaders(dataset_class, dataset_args=None, batch_size=32, val_size=0.2, test_size=0.2):
     dataset = dataset_class(**dataset_args)
@@ -75,7 +76,7 @@ def get_data_loaders(dataset_class, dataset_args=None, batch_size=32, val_size=0
 
     # Calculate targets for the training set only
     train_targets = [train_dataset[i][1] for i in range(len(train_dataset))]
-    class_counts = [250, 266, 172]  # Counts for each class
+    class_counts = list(Counter(train_targets).values())  # Counts for each class
     class_weights = 1. / torch.tensor(class_counts, dtype=torch.float)
     train_sample_weights = [class_weights[t] for t in train_targets]
     # Replacement = True, allows samples to be picked more than once in an epoch
@@ -87,7 +88,7 @@ def get_data_loaders(dataset_class, dataset_args=None, batch_size=32, val_size=0
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, sampler=sampler, num_workers=4, pin_memory=True)
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-    return train_loader, val_loader, test_loader
+    return train_loader, val_loader, test_loader, class_weights
 
 def plot_loss_curve(train_loss, val_loss, num_epochs, save_path=None):
     """Plot training and validation loss curves."""
