@@ -1,11 +1,12 @@
 # Script to train the models
+import numpy as np
 import torch
 import torch.nn as nn
 from model_classification import ResNet18, ResNet34
 from utils import get_data_loaders, save_model, MealDatasetClassification
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, f1_score, roc_auc_score
 
 def train_regression(model, experiment_name, batch_size, num_epochs, learning_rate, weight_decay):
     """
@@ -153,7 +154,7 @@ def train_classification(csv_file, model, experiment_name, batch_size, num_epoch
     """
     # Initialize general
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    writer = SummaryWriter(f"runs-classification/{experiment_name}")
+    writer = SummaryWriter(f"runs-portions-classification/{experiment_name}")
     model.to(device)
 
     # Prepare data
@@ -163,7 +164,8 @@ def train_classification(csv_file, model, experiment_name, batch_size, num_epoch
     torch.save(test_loader, f"models/trained_models_classification/tl-{experiment_name}.pt")
 
     # Loss and optimizer
-    criterion = nn.CrossEntropyLoss(weight=class_weights.to(device)) # use cross entropy for multi class classification
+    class_weights = (class_weights / class_weights.mean()).to(device)
+    criterion = nn.CrossEntropyLoss(weight=class_weights) # use cross entropy for multi class classification
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
 
@@ -189,6 +191,7 @@ def train_classification(csv_file, model, experiment_name, batch_size, num_epoch
         model.eval()
         all_preds = []
         all_targets = []
+        all_probs = []  # For storing probabilities needed for AUC
 
         with torch.no_grad():
             val_loss = 0.0
@@ -206,12 +209,46 @@ def train_classification(csv_file, model, experiment_name, batch_size, num_epoch
                 all_preds.extend(predicted.cpu().numpy())
                 all_targets.extend(classification.cpu().numpy())
 
+                # Store probabilities for AUC calculation
+                probs = torch.nn.functional.softmax(outputs, dim=1)
+                all_probs.extend(probs.cpu().numpy())
+
                 total += classification.size(0)
                 correct += (predicted == classification).sum().item()
 
+        # Calculate accuracy
         accuracy = 100 * correct / total
         curr_val_loss = val_loss / len(val_loader)
-        print(f"Val Loss: {curr_val_loss:.4f}, Accuracy: {accuracy:.2f}%")
+
+        # Convert lists to numpy arrays
+        all_preds = np.array(all_preds)
+        all_targets = np.array(all_targets)
+        all_probs = np.array(all_probs)
+
+        # Calculate F1 score
+        f1 = f1_score(all_targets, all_preds, average='weighted')
+
+        # Calculate AUC (for multi-class, we use one-vs-rest approach)
+        # For 3 classes, this will return 3 AUC values
+        n_classes = len(np.unique(all_targets))
+        auc_scores = []
+
+        # Calculate AUC for each class
+        for i in range(n_classes):
+            # One-vs-rest approach: current class vs all others
+            y_true_binary = (all_targets == i).astype(int)
+            y_score = all_probs[:, i]  # Probability for class i
+            try:
+                auc = roc_auc_score(y_true_binary, y_score)
+                auc_scores.append(auc)
+            except ValueError:
+                # This can happen if a class is not present in the validation set
+                auc_scores.append(float('nan'))
+
+        # Average AUC across all classes
+        mean_auc = np.nanmean(auc_scores)
+
+        print(f"Val Loss: {curr_val_loss:.4f}, Accuracy: {accuracy:.2f}%, F1 Score: {f1:.4f}, AUC: {mean_auc:.4f}")
 
         # Calculate confusion matrix
         cm = confusion_matrix(all_targets, all_preds)
@@ -223,11 +260,14 @@ def train_classification(csv_file, model, experiment_name, batch_size, num_epoch
         writer.add_scalar('Loss/train', loss.item(), epoch)
         writer.add_scalar('Loss/validation', curr_val_loss, epoch)
         writer.add_scalar('Accuracy/validation', accuracy, epoch)
+        writer.add_scalar('F1/validation', f1, epoch)
+        writer.add_scalar('AUC/validation', mean_auc, epoch)
 
     # Save the trained model
-    save_model(model, f"trained_models_classification/{experiment_name}.pth", num_epochs, optimizer, loss)
+    save_model(model, f"models/trained_portions_classification/{experiment_name}.pth", num_epochs, optimizer, loss)
     writer.close()
 
 if __name__ == "__main__":
     csv_filepath = r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Portions Estimation\data\processed_portions_classification\processed_portions_classification.csv"
-    train_classification(csv_filepath, ResNet34(num_classes=3), 'portions_resnet34_batch32_0.00001lr',batch_size=32, num_epochs=1000, learning_rate=0.00001, weight_decay=0.0)
+    train_classification(csv_filepath, ResNet34(num_classes=3), 'portions_resnet34_batch64_lr0.0001_wd0.001',
+                         batch_size=64, num_epochs=500, learning_rate=0.0001, weight_decay=0.001)
