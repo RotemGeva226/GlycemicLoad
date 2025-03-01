@@ -27,7 +27,7 @@ class MealDataset(Dataset):
         glycemic_load = self.data.iloc[idx, 2]
 
         # Load the RGB and RGBD tensors
-        combined_tensor = torch.load(combined_path) # Shape: [4, H, W]
+        combined_tensor = torch.load(combined_path, weights_only=False) # Shape: [4, H, W]
 
         # Separate RGB and depth channels
         rgb_tensor = combined_tensor[:3]  # Shape: [3, H, W]
@@ -58,14 +58,14 @@ class MealDatasetClassification(Dataset):
         classification = self.data.iloc[idx, 2]
 
         # Load the RGB tensor
-        rgb_tensor = torch.load(input_path)
+        rgb_tensor = torch.load(input_path, weights_only=False)
 
         return rgb_tensor, classification
 
 def get_data_loaders(dataset_class, dataset_args=None, batch_size=32, val_size=0.2, test_size=0.2):
     dataset = dataset_class(**dataset_args)
 
-    # Split proportions
+    # Split into different sets
     total_size = len(dataset)
     train_size = int((1 - val_size - test_size) * total_size)
     val_size = int(val_size * total_size)
@@ -76,17 +76,32 @@ def get_data_loaders(dataset_class, dataset_args=None, batch_size=32, val_size=0
 
     # Calculate targets for the training set only
     train_targets = [train_dataset[i][1] for i in range(len(train_dataset))]
-    class_counts = list(Counter(train_targets).values())  # Counts for each class
-    class_weights = 1. / torch.tensor(class_counts, dtype=torch.float)
+    class_counts = list(Counter(train_targets).values())  # Counts for each class - what is the freq of each class
+    class_weights = 1. / torch.tensor(class_counts, dtype=torch.float) # less frequent classes get higher weights
     train_sample_weights = [class_weights[t] for t in train_targets]
     # Replacement = True, allows samples to be picked more than once in an epoch
 
-    sampler = WeightedRandomSampler(weights=train_sample_weights, num_samples=len(train_sample_weights), replacement=True)
+    # Calculating tergets for validation set
+    val_targets = [val_dataset[i][1] for i in range(len(val_dataset))]
+    val_sample_weights = [class_weights[t] for t in val_targets]
 
+    # The sampler will oversample minority classes during training
+    train_sampler = WeightedRandomSampler(
+        weights=train_sample_weights,
+        num_samples=len(train_sample_weights),
+        replacement=True
+    )
+    val_sampler = WeightedRandomSampler(
+        weights=val_sample_weights,
+        num_samples=len(val_sample_weights),
+        replacement=True
+    )
 
     # Create DataLoaders
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, sampler=sampler, num_workers=4, pin_memory=True)
-    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, sampler=train_sampler,
+                                               num_workers=4, pin_memory=True)
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, sampler=val_sampler,
+                                             num_workers=4, pin_memory=True, shuffle=False)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     return train_loader, val_loader, test_loader, class_weights
 
