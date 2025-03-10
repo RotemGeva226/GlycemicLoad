@@ -205,7 +205,7 @@ def train_classification_sweep():
         model_type=config.model_type)
 
     wandb.run.name = (f"sweep-run-{config.model_type}-{config.batch_size}-"
-                       f"{config.learning_rate:.4f}--{config.weight_decay:.4f}")
+                       f"{config.learning_rate}--{config.weight_decay}")
     wandb.run.save()
 
     wandb.summary["model_type"] = config.model_type
@@ -214,7 +214,7 @@ def train_classification_sweep():
     csv_file = (r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Portions Estimation\data"
                 r"\processed_portions_classification\processed_portions_classification.csv")
     experiment_name = (f"sweep-run-{config.model_type}-{config.batch_size}-"
-                       f"{config.learning_rate:.4f}--{config.weight_decay:.4f}")
+                       f"{config.learning_rate}--{config.weight_decay}")
 
     # Initialize general
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -224,12 +224,13 @@ def train_classification_sweep():
     wandb.watch(model, log="all")
 
     # Prepare data
-    train_loader, val_loader, test_loader, class_weights = get_data_loaders(
-        dataset_class=MealDatasetClassification,
-        batch_size=config.batch_size,
-        dataset_args={"csv_file": csv_file}
-    )
-    torch.save(test_loader, f"models/portions_classification/tl-{experiment_name}.pt")
+    # train_loader, val_loader, test_loader, class_weights = get_data_loaders(
+    #     dataset_class=MealDatasetClassification,
+    #     batch_size=config.batch_size,
+    #     dataset_args={"csv_file": csv_file}
+    # )
+    # torch.save(test_loader, f"models/portions_classification/tl-{experiment_name}.pt")
+    train_loader, val_loader, test_loader, class_weights = prepare_and_log_datasets(csv_file, experiment_name)
 
     # Loss and optimizer
     class_weights = (class_weights / class_weights.mean()).to(device)
@@ -385,7 +386,7 @@ def create_model(model_type):
     else:
         raise ValueError(f"Unknown model type: {model_type}")
 
-def prepare_and_log_datasets(csv_file):
+def prepare_and_log_datasets(csv_file, experiment_name):
     # Create dataset artifact
     dataset_artifact = wandb.Artifact(
         name="meal-classification-dataset",
@@ -408,7 +409,8 @@ def prepare_and_log_datasets(csv_file):
     )
 
     # Save and log the test set separately
-    test_set_path = f"data/test_set_{wandb.run.id}.pt"
+    path = r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Portions Estimation\src\models\portions_classification"
+    test_set_path = f"{path}/test_set_{experiment_name}.pt"
     torch.save(test_loader, test_set_path)
 
     test_artifact = wandb.Artifact(
@@ -440,18 +442,16 @@ def create_sweep_config():
                 'values': [1e-6, 5e-6, 1e-5, 5e-5, 1e-4, 5e-4, 1e-3]
             },
             'num_epochs': {
-                'min': 100,
-                'max': 1000
+                'values': [1000]
             },
             'model_type': {
                 'values': ['ResNet18', 'ResNet34', 'ResNet50']
             },
         },
             'early_terminate': { # To reduce overfitting
-            'type': 'plateau',
-            'min_iter': 100,          # Minimum epochs before considering stopping
-            'patience': 15,          # Number of epochs with no improvement to wait
-            'metric': 'val_loss'     # Metric to monitor
+            'type': 'hyperband',
+            'min_iter': 400,
+            'metric': 'val_loss'
             }
         }
     return sweep_config
