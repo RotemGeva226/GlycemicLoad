@@ -1,12 +1,15 @@
+import os
 import wandb
 import torch
 import torch.nn as nn
 import numpy as np
 from tqdm import tqdm
-from sklearn.metrics import f1_score, roc_auc_score, confusion_matrix, ConfusionMatrixDisplay
-from utils import save_model, MealDatasetClassification, get_data_loaders
+from sklearn.metrics import f1_score, roc_auc_score, confusion_matrix, ConfusionMatrixDisplay, mean_squared_error, \
+    mean_absolute_error, r2_score
+from utils import save_model, MealDatasetClassification, get_data_loaders, MealDataset, get_data_loaders_regression
 import matplotlib.pyplot as plt
 from model_classification import ResNet34, ResNet18, ResNet50
+from model_regression import ResNet34Regression, InceptionV3Regression
 
 
 def train_classification(csv_file, model, experiment_name, batch_size, num_epochs, learning_rate, weight_decay):
@@ -224,12 +227,6 @@ def train_classification_sweep():
     wandb.watch(model, log="all")
 
     # Prepare data
-    # train_loader, val_loader, test_loader, class_weights = get_data_loaders(
-    #     dataset_class=MealDatasetClassification,
-    #     batch_size=config.batch_size,
-    #     dataset_args={"csv_file": csv_file}
-    # )
-    # torch.save(test_loader, f"models/portions_classification/tl-{experiment_name}.pt")
     train_loader, val_loader, test_loader, class_weights = prepare_and_log_datasets(csv_file, experiment_name)
 
     # Loss and optimizer
@@ -442,7 +439,7 @@ def create_sweep_config():
                 'values': [1e-6, 5e-6, 1e-5, 5e-5, 1e-4, 5e-4, 1e-3]
             },
             'num_epochs': {
-                'values': [1000]
+                'values': [500]
             },
             'model_type': {
                 'values': ['ResNet18', 'ResNet34', 'ResNet50']
@@ -461,11 +458,174 @@ def run_sweep():
     sweep_id = wandb.sweep(sweep_config, project="meal-portions-classification")
 
     # Start the sweep agent
-    wandb.agent(sweep_id, function=train_classification_sweep, count=20)
+    wandb.agent(sweep_id, function=train_classification_sweep, count=10)
 
 
+def train_regression(model, experiment_name, batch_size, num_epochs, learning_rate, weight_decay):
+    """
+    This function trains the model with Weights & Biases logging.
+    :param model: the model to be trained.
+    :param experiment_name: the name of the experiment.
+    :param batch_size: the batch size.
+    :param num_epochs: the number of epochs.
+    :param learning_rate: the learning rate.
+    :param weight_decay: the weight decay.
+    """
+    # Initialize general
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+    csv_file = r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Portions Estimation\data\processed_single_ingr_portions_regression\processed_single_ingr_portions_regression.csv"
+
+    # Initialize wandb
+    wandb.init(project="single-ingr-portions-regression", name=experiment_name, config={
+        "learning_rate": learning_rate,
+        "weight_decay": weight_decay,
+        "batch_size": batch_size,
+        "num_epochs": num_epochs,
+        "architecture": model.__class__.__name__,
+        "device": device
+    })
+
+    # Log model architecture
+    wandb.watch(model, log="all")
+
+    # Prepare data
+    train_loader, val_loader, test_loader = get_data_loaders_regression(dataset_class=MealDataset,
+                                                                            batch_size=batch_size,
+                                                                            dataset_args={"csv_file": csv_file})
+    torch.save(test_loader, f"models/single_ingr_portions_regression/tl-{experiment_name}.pt")
+
+    # Loss and optimizer
+    criterion = nn.MSELoss()  # use MSELoss for regression
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+
+    # For saving best model
+    best_val_loss = float('inf')
+    best_r2 = -float('inf')  # R² can be negative, so start with negative infinity
+
+    # Training loop
+    for epoch in tqdm(range(num_epochs), desc="Training Epochs"):
+        model.train()  # Set the model to training mode
+        running_loss = 0.0
+        steps = 0
+
+        for tensor, mass in train_loader:
+            tensor = tensor.float().to(device)
+            mass = mass.float().to(device)
+
+            # Forward pass
+            outputs = model(tensor)
+
+            # Compute loss
+            loss = criterion(outputs, mass)
+            running_loss += loss.item()
+            steps += 1
+
+            # Backward pass
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+        epoch_loss = running_loss / steps
+
+        # Validation loop
+        model.eval()
+        val_loss = 0.0
+        val_steps = 0
+        all_predictions = []
+        all_targets = []
+
+        with torch.no_grad():
+            for tensor, mass in val_loader:
+                tensor = tensor.float().to(device)
+                mass = mass.float().to(device)
+
+                outputs = model(tensor)
+                val_loss += criterion(outputs, mass).item()
+                val_steps += 1
+
+                # Collect predictions and targets for visualization
+                all_predictions.extend(outputs.cpu().numpy().flatten())
+                all_targets.extend(mass.cpu().numpy().flatten())
+
+        val_epoch_loss = val_loss / val_steps
+
+        # Convert to numpy arrays for metrics
+        all_predictions = np.array(all_predictions)
+        all_targets = np.array(all_targets)
+
+        # Calculate metrics
+        mse = mean_squared_error(all_targets, all_predictions)
+        rmse = np.sqrt(mse)
+        mae = mean_absolute_error(all_targets, all_predictions)
+        r2 = r2_score(all_targets, all_predictions)
+
+        # Print status
+        print(
+            f"Epoch [{epoch + 1}/{num_epochs}], Loss: {epoch_loss:.4f}, Val Loss: {val_epoch_loss:.4f}, RMSE: {rmse:.4f}, R²: {r2:.4f}")
+
+        # Log to wandb - basic metrics
+        wandb.log({
+            "epoch": epoch,
+            "train_loss": epoch_loss,
+            "val_loss": val_epoch_loss,
+            "val_mse": mse,
+            "val_rmse": rmse,
+            "val_mae": mae,
+            "val_r2": r2
+        })
+
+        # Log distribution plots
+        wandb.log({
+            "prediction_distribution": wandb.Histogram(all_predictions),
+            "target_distribution": wandb.Histogram(all_targets),
+            "error_distribution": wandb.Histogram(all_predictions - all_targets)
+        })
+
+        # Log scatter plot
+        wandb.log({
+            "predictions_vs_targets": wandb.plot.scatter(
+                table=wandb.Table(data=[[x, y] for x, y in zip(all_targets, all_predictions)],
+                                  columns=["Actual", "Predicted"]),
+                x="Actual",
+                y="Predicted",
+                title="Predicted vs. Actual Mass"
+            )
+        })
+
+        # Save best model by validation loss
+        if val_epoch_loss < best_val_loss:
+            best_val_loss = val_epoch_loss
+            save_model(model, f"models/single_ingr_portions_regression/{experiment_name}_best_loss.pth", epoch, optimizer, loss)
+            wandb.run.summary["best_val_loss"] = best_val_loss
+            wandb.run.summary["best_val_loss_epoch"] = epoch
+
+        # Save best model by R² score (higher is better)
+        if r2 > best_r2:
+            best_r2 = r2
+            save_model(model, f"models/single_ingr_portions_regression/{experiment_name}_best_r2.pth", epoch, optimizer, loss)
+            wandb.run.summary["best_r2"] = best_r2
+            wandb.run.summary["best_r2_epoch"] = epoch
+
+    # Save the final trained model
+    save_model(model, f"models/single_ingr_portions_regression/{experiment_name}.pth", num_epochs, optimizer, loss)
+
+    # Log model as an artifact
+    model_artifact = wandb.Artifact(f"model-{experiment_name}", type="model")
+    model_artifact.add_file(f"single_ingr_portions_regression/{experiment_name}.pth")
+    wandb.log_artifact(model_artifact)
+
+    # Add best models to artifact as well
+    model_artifact.add_file(f"single_ingr_portions_regression/{experiment_name}_best_loss.pth")
+    model_artifact.add_file(f"single_ingr_portions_regression/{experiment_name}_best_r2.pth")
+
+    # Finish wandb run
+    wandb.finish()
+
+    return model
 if __name__ == "__main__":
-    # csv_filepath = r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Portions Estimation\data\processed_portions_classification\processed_portions_classification.csv"
-    # train_classification(csv_filepath, ResNet34(num_classes=3), 'portions_resnet34_batch64_lr0.001',
-    #                      batch_size=64, num_epochs=450, learning_rate=0.001, weight_decay=0.0)
-    run_sweep()
+    csv_filepath = r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Portions Estimation\data\processed_single_ingr_portions_classification\processed_single_ingr_portions_classification.csv"
+    train_regression(model=ResNet34Regression(True), experiment_name="Test", batch_size=64,num_epochs=300, learning_rate=0.0001,weight_decay=0.001)
+    # train_classification(csv_filepath, ResNet34(num_classes=3), 'ResNet34-64-0.00001--0.000001',
+    #                      batch_size=64, num_epochs=650, learning_rate=0.00001, weight_decay=0.000001)
+    # run_sweep()
