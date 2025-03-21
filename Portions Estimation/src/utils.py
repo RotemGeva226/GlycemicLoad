@@ -1,7 +1,7 @@
 # Utility functions (e.g., for saving/loading models, metrics)
 from collections import Counter
-
 import numpy as np
+from PIL import Image
 from torch.utils.data import Dataset
 import pandas as pd
 import torch
@@ -12,37 +12,68 @@ from model_regression import ResNet34WithRGBandRGBD
 from torch.utils.data.sampler import WeightedRandomSampler
 
 
-
+IMAGENET_MEAN = [0.485, 0.456, 0.406]
+IMAGENET_STD = [0.229, 0.224, 0.225]
 class MealDataset(Dataset):
-    def __init__(self, csv_file, transform=None):
+    def __init__(self, csv_file, train_mode=True):
         self.data = pd.read_csv(csv_file)
-        self.transform = transform
+        self.train_mode = train_mode
+
+        self.train_transform = T.Compose([
+            T.RandomHorizontalFlip(p=0.5),
+            T.RandomRotation(degrees=10),
+            T.ColorJitter(brightness=0.25, contrast=0.25, saturation=0.25, hue=0.15),
+            T.Resize(244),
+            T.ToTensor(),
+            T.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD)
+        ])
+
+        self.eval_transform = T.Compose([
+            T.Resize(244),
+            T.ToTensor(),
+            T.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD)
+        ])
+
+        self.transform = self.train_transform if train_mode else self.eval_transform
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
         dish_id = self.data.iloc[idx, 0]
-        combined_path = self.data.iloc[idx, 1]
-        glycemic_load = self.data.iloc[idx, 2]
+        image_path = self.data.iloc[idx, 1]
+        target_value = self.data.iloc[idx, 2]
 
-        # Load the RGB and RGBD tensors
-        combined_tensor = torch.load(combined_path, weights_only=False) # Shape: [4, H, W]
+        image = Image.open(image_path).convert('RGB')
+        image = self.transform(image)
+        return image, target_value
 
-        # Separate RGB and depth channels
-        rgb_tensor = combined_tensor[:3]  # Shape: [3, H, W]
-        depth_tensor = combined_tensor[3:]  # Shape: [1, H, W]
+def get_data_loaders_regression(dataset_class, dataset_args=None, batch_size=32, val_size=0.2, test_size=0.2):
+    dataset_args['train_mode'] = True
+    dataset = dataset_class(**dataset_args)
 
-        # Apply augmentations to the RGB tensor
-        if self.transform:
-            augmented_rgb = self.transform(rgb_tensor)
+    # Split into different sets
+    total_size = len(dataset)
+    train_size = int((1 - val_size - test_size) * total_size)
+    val_size = int(val_size * total_size)
+    test_size = total_size - train_size - val_size  # The remaining data for testing
 
-            depth_tensor = self.transform(depth_tensor)
+    # Perform the split
+    generator = torch.Generator().manual_seed(42)
+    train_dataset, val_dataset, test_dataset = random_split(dataset,
+                                                            [train_size, val_size, test_size],
+                                                            generator=generator)
 
-        # Combine RGB and depth tensors back
-        combined_tensor = torch.cat((augmented_rgb, depth_tensor), dim=0)
+    val_dataset.dataset.train_mode = False
+    test_dataset.dataset.train_mode = False
+    # Create DataLoaders
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size,
+                                               num_workers=2, pin_memory=True)
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size,
+                                             num_workers=2, pin_memory=True, shuffle=False)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    return train_loader, val_loader, test_loader
 
-        return combined_tensor, glycemic_load
 
 class MealDatasetClassification(Dataset):
     def __init__(self, csv_file, transform=None):
@@ -99,11 +130,13 @@ def get_data_loaders(dataset_class, dataset_args=None, batch_size=32, val_size=0
 
     # Create DataLoaders
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, sampler=train_sampler,
-                                               num_workers=4, pin_memory=True)
+                                               num_workers=2, pin_memory=True)
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, sampler=val_sampler,
-                                             num_workers=4, pin_memory=True, shuffle=False)
+                                             num_workers=2, pin_memory=True, shuffle=False)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     return train_loader, val_loader, test_loader, class_weights
+
+
 
 def plot_loss_curve(train_loss, val_loss, num_epochs, save_path=None):
     """Plot training and validation loss curves."""
