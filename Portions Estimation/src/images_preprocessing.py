@@ -1,4 +1,6 @@
 # Functions for preprocessing images and ingredient labels
+import cv2
+import torchvision.transforms as T
 import torch
 from google.cloud import storage
 import os
@@ -11,7 +13,7 @@ import matplotlib.pyplot as plt
 BUCKET_NAME = "nutrition5k_dataset"
 REALSENSE_OVERHEAD_PATH = "nutrition5k_dataset/imagery/realsense_overhead/"
 CURRENT_DIR = os.path.dirname(os.getcwd())
-PROCESSED_DATA_DIR = os.path.join(CURRENT_DIR, r"data\rgb_processed_imagenet")
+PROCESSED_DATA_DIR = os.path.join(CURRENT_DIR, r"data\processed_single_ingr_portions_regression_incp")
 RAW_DATA_DIR = os.path.join(CURRENT_DIR, r"data\raw")
 INGREDIENTS_METADATA_FILEPATH = os.path.join(CURRENT_DIR, r"data/ingredients.csv")
 
@@ -160,7 +162,8 @@ def preprocess_dataset_portions_classification(annotations_file, target_size=(22
             if os.path.exists(rgb_full_path):
                 os.remove(rgb_full_path)
 
-    pd.DataFrame(preprocessed_data).to_csv(os.path.join(PROCESSED_DATA_DIR, "processed_portions_classification.csv"), index=False)
+    pd.DataFrame(preprocessed_data).to_csv(os.path.join(PROCESSED_DATA_DIR,
+                                                        "processed_inception_portions_classification.csv"), index=False)
 
 def preprocess_dataset(annotations_file, target_size=(224, 224)) -> None:
     """
@@ -204,7 +207,30 @@ def preprocess_dataset(annotations_file, target_size=(224, 224)) -> None:
 
     pd.DataFrame(preprocessed_data).to_csv(os.path.join(PROCESSED_DATA_DIR, "processed_annotations.csv"), index=False)
 
-def visualize_preprocessed_image(image_tensor):
+def preprocess_dataset_local_images(annotations_file, target_size=(224, 224)):
+    annotations = pd.read_csv(annotations_file)
+    os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
+    images_folder_path = r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Portions Estimation\data\single_ingredient_images"
+    preprocessed_data = []
+
+    for _, row in tqdm(annotations.iterrows(), total=len(annotations)):
+        dish_id = row.iloc[0]
+        mass = row.iloc[1]
+        rgb_path = os.path.join(images_folder_path, dish_id + ".jpg")
+        preprocessed_rgb_tensor = preprocess_rgb(rgb_path, target_size)
+
+        output_combined_path = os.path.join(PROCESSED_DATA_DIR, f"{dish_id}.pt")
+        torch.save(preprocessed_rgb_tensor, output_combined_path)
+        preprocessed_data.append({
+            "image_id": dish_id,
+            "processed_image_path": output_combined_path,
+            "mass": mass
+        })
+
+    pd.DataFrame(preprocessed_data).to_csv(os.path.join(PROCESSED_DATA_DIR,
+                                                        "processed_single_ingr_portions_regression_incp.csv"), index=False)
+
+def visualize_preprocessed_image(image_tensor_path):
     # Convert the Tensor back to NumPy for visualization
     unnormalized_image = image_tensor.permute(1, 2, 0).numpy()
     plt.imshow(unnormalized_image)
