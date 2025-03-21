@@ -39,6 +39,8 @@ def train_classification(csv_file, model, experiment_name, batch_size, num_epoch
 
     # Initialize general
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if device.type == 'cuda':
+        torch.cuda.empty_cache()
     model.to(device)
 
     # Log model architecture
@@ -81,6 +83,16 @@ def train_classification(csv_file, model, experiment_name, batch_size, num_epoch
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+
+            if train_batches % 100 == 0 and torch.cuda.is_available():
+                if torch.cuda.memory_allocated() > 0.8 * torch.cuda.get_device_properties(0).total_memory:
+                    torch.cuda.synchronize()
+                    torch.cuda.empty_cache()
+
+        if train_batches % 100 == 0 and torch.cuda.is_available():
+            if torch.cuda.memory_allocated() > 0.8 * torch.cuda.get_device_properties(0).total_memory:
+                torch.cuda.synchronize()
+                torch.cuda.empty_cache()
 
         avg_train_loss = train_loss / train_batches
 
@@ -221,6 +233,8 @@ def train_classification_sweep():
 
     # Initialize general
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if device.type == 'cuda':
+        torch.cuda.empty_cache()
     model.to(device)
 
     # Log model architecture
@@ -264,6 +278,16 @@ def train_classification_sweep():
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+
+            # Periodically clear cache during training
+            if train_batches % 100 == 0 and torch.cuda.is_available():
+                if torch.cuda.memory_allocated() > 0.8 * torch.cuda.get_device_properties(0).total_memory:
+                    torch.cuda.synchronize()
+                    torch.cuda.empty_cache()
+
+        # Clear after each epoch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
         avg_train_loss = train_loss / train_batches
 
@@ -337,6 +361,15 @@ def train_classification_sweep():
         disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["Low", "Medium", "High"])
         disp.plot(cmap="Blues", ax=ax)
 
+        # Create a custom temp directory with a shorter path
+        temp_dir = os.path.join(os.getcwd(), 'temp_wandb')
+        os.makedirs(temp_dir, exist_ok=True)
+
+        # Save the figure to a file first
+        temp_file = os.path.join(temp_dir, f'confusion_matrix_epoch_{epoch}.png')
+        fig.savefig(temp_file)
+        plt.close(fig)
+
         # Log to W&B
         wandb.log({
             "epoch": epoch,
@@ -345,11 +378,24 @@ def train_classification_sweep():
             "accuracy": accuracy,
             "f1_score": f1,
             "auc": mean_auc,
-            "confusion_matrix": wandb.Image(fig),
             "learning_rate": optimizer.param_groups[0]['lr']
-        })
+        }
 
-        plt.close(fig)
+        # Only add the confusion matrix if the file exists
+        if os.path.exists(temp_file):
+            try:
+                log_dict["confusion_matrix"] = wandb.Image(temp_file)
+            except Exception as e:
+                print(f"Failed to log confusion matrix: {e}")
+
+        # Log all metrics
+        wandb.log(log_dict)
+
+        # Clean up to avoid filling disk
+        try:
+            os.remove(temp_file)
+        except:
+            pass
 
         # Save best model
         if accuracy > best_accuracy:
@@ -406,7 +452,7 @@ def prepare_and_log_datasets(csv_file, experiment_name):
     )
 
     # Save and log the test set separately
-    path = r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Portions Estimation\src\models\portions_classification"
+    path = r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Portions Estimation\src\models\single_ingr_portions_classification"
     test_set_path = f"{path}/test_set_{experiment_name}.pt"
     torch.save(test_loader, test_set_path)
 
@@ -445,17 +491,28 @@ def create_sweep_config():
                 'values': ['ResNet18', 'ResNet34', 'ResNet50']
             },
         },
-            'early_terminate': { # To reduce overfitting
-            'type': 'hyperband',
-            'min_iter': 400,
-            'metric': 'val_loss'
+        'early_terminate': {  # Check that there is no significant improvement over long period of time (plateau)
+                              # There are many fluctuations that reset the early stopping.
+            'type': 'plateau',
+            'min_iter': 150,  # Minimum epochs before considering stopping
+            'patience': 25,  # Number of epochs with no improvement to wait
+            'threshold': 0.025, # minimum change to qualify as an improvement
+            'threshold_mode': 'rel',
+            'mode': 'min',
+            'metric': 'val_loss',  # Metric to monitor
+            'smoothing_factor': 0.65 # How much historical values influence.65% of this metric will come from
+            # previous values and 35% will come from current epoch -> more responsive to recent changes and less
+            # affected by historical values.
+        },
+        'scheduler': {
+            'type': 'sequential',
             }
         }
     return sweep_config
 
 def run_sweep():
     sweep_config = create_sweep_config()
-    sweep_id = wandb.sweep(sweep_config, project="meal-portions-classification")
+    sweep_id = wandb.sweep(sweep_config, project="single-ingr-portions-classification")
 
     # Start the sweep agent
     wandb.agent(sweep_id, function=train_classification_sweep, count=10)
