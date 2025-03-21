@@ -232,12 +232,57 @@ def preprocess_dataset_local_images(annotations_file, target_size=(224, 224)):
 
 def visualize_preprocessed_image(image_tensor_path):
     # Convert the Tensor back to NumPy for visualization
+    image_tensor = torch.load(image_tensor_path)
     unnormalized_image = image_tensor.permute(1, 2, 0).numpy()
     plt.imshow(unnormalized_image)
     plt.axis("off")  # Turn off axes for better viewing
     plt.title("Preprocessed Image")
     plt.show()
 
+
+def get_augmentations():
+    return T.Compose([
+        T.RandomHorizontalFlip(p=0.5),
+        T.RandomRotation(degrees=10),
+        T.ColorJitter(brightness=0.25, contrast=0.25, saturation=0.25, hue=0.15),
+        T.RandomResizedCrop(size=(224, 224), scale=(0.9, 1.0), ratio=(0.95, 1.05)),
+        T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        T.ToTensor(),
+    ])
+
+
+def augment_image(image_path):
+    image = cv2.imread(image_path)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    transform = get_augmentations()
+    image = T.ToPILImage()(image)
+    augmented = transform(image)
+    return augmented
+
+
+def display_augmentation(image_path):
+    augmented = augment_image(image_path)
+
+    # Convert augmented tensor back to numpy for display
+    augmented_np = augmented.permute(1, 2, 0).numpy()
+
+    # Create a figure with two subplots
+    plt.figure(figsize=(12, 6))
+
+    # Display augmented image
+    plt.imshow(augmented_np)
+    plt.axis('off')
+    plt.tight_layout()
+    plt.show()
+
+    return augmented
+
 if __name__ == "__main__":
-    path = r"/Portions Estimation/data/ready_for_train/processed_portions_classification.csv"
-    preprocess_dataset_portions_classification(path, (224, 224))
+    csv_path = r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Portions Estimation\data\ingredients\SingleDishDataset.csv"
+    # target_folder_path = r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Portions Estimation\data\single_ingredient_images"
+    # preprocess_dataset_local_images(csv_path)
+    image_path = r"C:\Users\rotem.geva\Desktop\rgb.png"
+    transform = T.CenterCrop(224)
+    image = Image.open(image_path)
+    cropped_image = transform(image)
+    cropped_image.show()
