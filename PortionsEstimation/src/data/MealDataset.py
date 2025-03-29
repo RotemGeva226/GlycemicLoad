@@ -1,16 +1,12 @@
-# Utility functions (e.g., for saving/loading models, metrics)
 from collections import Counter
-import numpy as np
-from PIL import Image
-from torch.utils.data import Dataset
+
 import pandas as pd
 import torch
-from torch.utils.data import random_split
-import matplotlib.pyplot as plt
 import torchvision.transforms as T
-from model_regression import ResNet34WithRGBandRGBD
+from PIL import Image
+from torch.utils.data import Dataset
+from torch.utils.data import random_split
 from torch.utils.data.sampler import WeightedRandomSampler
-
 
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
@@ -23,13 +19,13 @@ class MealDataset(Dataset):
             T.RandomHorizontalFlip(p=0.5),
             T.RandomRotation(degrees=10),
             T.ColorJitter(brightness=0.25, contrast=0.25, saturation=0.25, hue=0.15),
-            T.Resize(244),
+            T.Resize((224,224)),
             T.ToTensor(),
             T.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD)
         ])
 
         self.eval_transform = T.Compose([
-            T.Resize(244),
+            T.Resize((224,224)),
             T.ToTensor(),
             T.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD)
         ])
@@ -48,7 +44,8 @@ class MealDataset(Dataset):
         image = self.transform(image)
         return image, target_value
 
-def get_data_loaders_regression(dataset_class, dataset_args=None, batch_size=32, val_size=0.2, test_size=0.2):
+
+def get_regression_loader(dataset_class, dataset_args=None, batch_size=32, val_size=0.2, test_size=0.2):
     dataset_args['train_mode'] = True
     dataset = dataset_class(**dataset_args)
 
@@ -74,26 +71,7 @@ def get_data_loaders_regression(dataset_class, dataset_args=None, batch_size=32,
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     return train_loader, val_loader, test_loader
 
-
-class MealDatasetClassification(Dataset):
-    def __init__(self, csv_file, transform=None):
-        self.data = pd.read_csv(csv_file)
-        self.transform = transform
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, idx):
-        dish_id = self.data.iloc[idx, 0]
-        input_path = self.data.iloc[idx, 1]
-        classification = self.data.iloc[idx, 2]
-
-        # Load the RGB tensor
-        rgb_tensor = torch.load(input_path, weights_only=False)
-
-        return rgb_tensor, classification
-
-def get_data_loaders(dataset_class, dataset_args=None, batch_size=32, val_size=0.2, test_size=0.2):
+def get_classification_loader(dataset_class, dataset_args=None, batch_size=32, val_size=0.2, test_size=0.2):
     dataset = dataset_class(**dataset_args)
 
     # Split into different sets
@@ -135,56 +113,3 @@ def get_data_loaders(dataset_class, dataset_args=None, batch_size=32, val_size=0
                                              num_workers=2, pin_memory=True, shuffle=False)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     return train_loader, val_loader, test_loader, class_weights
-
-
-
-def plot_loss_curve(train_loss, val_loss, num_epochs, save_path=None):
-    """Plot training and validation loss curves."""
-    print(f'The train loss array is: {train_loss}')
-    print(f'The validation loss array is: {val_loss}')
-    x = np.arange(num_epochs)
-    plt.plot(x,train_loss, label="Train Loss")
-    plt.plot(x, val_loss, label="Validation Loss")
-    plt.xlabel("Epochs")
-    plt.xticks(np.arange(0, num_epochs, 5), fontsize=10)
-    plt.ylabel("Loss")
-    plt.legend()
-    plt.title("Loss Curve")
-    if save_path:
-        plt.savefig(save_path)
-    plt.show()
-
-def save_model(model, model_path, epoch, optimizer, loss):
-    try:
-        torch.save({
-        'epoch': epoch,
-        'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict(),
-        'loss': loss}, model_path)
-        print('Model saved successfully.')
-    except Exception as e:
-        print(f'An error occurred while saving the model: {e}')
-
-def load_model(model_path, model_class, optimizer_class=None, model_args: dict=None, optimizer_args: dict=None, mode='continue_training'):
-    try:
-        model = model_class(**model_args)
-        model.to(torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
-        checkpoint = torch.load(model_path, weights_only=True)
-        model.load_state_dict(checkpoint['model_state_dict'])
-        if mode == 'continue_training':
-            optimizer = optimizer_class(model.parameters(), **optimizer_args)
-            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-            epoch = checkpoint['epoch']
-            loss = checkpoint['loss']
-            print('Model loaded successfully.')
-            return model, optimizer, epoch, loss
-        else:
-            return model
-    except Exception as e:
-        print('An error occurred while loading the model:', e)
-
-if __name__ == "__main__":
-    load_model(
-        model_path=r"/Portions Estimation/src/trained_models_regression\Test1.pth",
-        model_class=ResNet34WithRGBandRGBD,
-        model_args={'is_pretrained': False,}, optimizer_class=torch.optim.AdamW, optimizer_args={'lr': 1e-4})

@@ -1,11 +1,13 @@
 import pandas as pd
 import os
+from pathlib import Path
 from tqdm import tqdm
 
 
 def extract_ingredients(row, sauces) -> list:
     """
     This function extracts ingredients from a row from the csv file (Nutrtion5k dataset).
+    :param sauces: A list of ignored ingredients, that cannot be seen through the image.
     :param row: contains ingredients from a row.
     :return: ingredients in the row.
     """
@@ -20,7 +22,6 @@ def extract_ingredients(row, sauces) -> list:
                 ingredients.append(next_value)
     return ingredients
 
-
 def add_unique_items(list1, list2) -> list:
     """
     This function adds unique items from two lists.
@@ -32,7 +33,6 @@ def add_unique_items(list1, list2) -> list:
         if item not in list1:
             list1.append(item)
     return list1
-
 
 def extract_ingredient_content(row, ingredient, mode) -> str or None:
     """
@@ -53,14 +53,13 @@ def extract_ingredient_content(row, ingredient, mode) -> str or None:
     if index + add < len(ls):
         return ls[index + add]
 
-
 def preprocess_ingredients_dataset(annotations_file, metadata_file) -> None:
     """
-    This function preprocesses the ingredients dataset.
+    This function preprocesses the ingredients' dataset.
     :param annotations_file: the input file that contains all dishes metadata from Nutrition5k dataset.
     :param metadata_file: the input file that contains all ingredients metadata from Nutrition5k dataset.
     """
-    annotations = pd.read_csv(annotations_file, header=None)
+    annotations = pd.read_csv(annotations_file, header=None, on_bad_lines='skip')
     metadata = pd.read_csv(metadata_file)
     metadata_filtered = metadata.dropna(subset=['Glycemic Index']) # Remove ingredients without glycemic index.
     sauces = metadata_filtered[metadata_filtered['IsSauce'] == 'Yes']['ingr'].tolist()
@@ -72,7 +71,7 @@ def preprocess_ingredients_dataset(annotations_file, metadata_file) -> None:
         dish_id = row.iloc[0]
         ingredients = extract_ingredients(row, sauces)
         is_all_exist = all(ingredient in remained_ingredients for ingredient in ingredients) # Returns true if all
-        # ingredients exist in remained_ingredients, meaning they all have glycemic indexes.
+        # ingredients exist in remained_ingredients, are ingredients that they all have glycemic indexes.
         if is_all_exist: # Continue only if all ingredients have glycemic index value in metadata file.
             for ingredient in ingredients:
                 if ingredient not in sauces:
@@ -83,7 +82,7 @@ def preprocess_ingredients_dataset(annotations_file, metadata_file) -> None:
                     new_row_data = {'Dish ID': dish_id, 'Ingredient Name': ingredient, "Mass (g)": mass, "Carbs (g)": carbs,
                                     "Glycemic Index": glycemic_index, "Glycemic Load": glycemic_load}
                     res.loc[len(res)] = new_row_data
-    res.to_csv(os.path.join(os.path.dirname(os.getcwd()), r'data/ingredients-130124.csv'), index=False)
+    res.to_csv(os.path.join(os.path.dirname(os.getcwd()), r'data/ingredients-cafe2.csv'), index=False)
 
 def classify_ingredients(input_filepath: str):
     """
@@ -103,14 +102,42 @@ def classify_ingredients(input_filepath: str):
             df.loc[df['Dish ID'] == group, 'Class'] = 3
     df.to_csv(input_filepath, index=False)
 
+def prepare_dataset_single_ingredient(annotations_filepath, sauces_filepath):
+    annotations = pd.read_csv(annotations_filepath, header=None)
+    sauces_df = pd.read_csv(sauces_filepath)
+    res = pd.DataFrame(columns=["Dish ID", "Mass (g)"])
+    sauces = sauces_df[sauces_df['IsSauce'] == 'Yes']['ingr'].tolist()
+    for _, row in tqdm(annotations.iterrows(), total=len(annotations)):
+        dish_id = row.iloc[0]
+        dish_ingredients = extract_ingredients(row, sauces)
+        if len(dish_ingredients) == 1:
+            dish_mass = extract_ingredient_content(row, dish_ingredients[0], mode='mass')
+            new_row_data = {'Dish ID': dish_id, "Mass (g)": dish_mass}
+            res.loc[len(res)] = new_row_data
+    res.to_csv("SingleDishDatasetCafe2.csv", index=False)
+
 
 if __name__ == '__main__':
-    dirname = os.path.dirname(os.getcwd())
-    # input_filepath = os.path.join(dirname, r"data/raw/nutrition5k_dataset_metadata_dish_metadata_cafe1.csv")
+    # dirname = os.path.dirname(os.getcwd())
+    # input_filepath = os.path.join(dirname, r"data/raw/nutrition5k_dataset_metadata_dish_metadata_cafe2.csv")
     # sauces_filepath = os.path.join(dirname, r"data/raw/nutrition5k_dataset_metadata_ingredients_metadata.csv")
-    # preprocess_ingredients_dataset(input_filepath, sauces_filepath)
-    input_filepath = os.path.join(dirname, r"data/ingredients-130124.csv")
-    classify_ingredients(input_filepath)
+    folder_path = r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Portions Estimation\data\single_ingredient_images"
+    files = [f for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))]
+    files_no_extension = [Path(f).stem for f in files]
+    csv_filepath = r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Portions Estimation\data\ingredients\SingleDishDataset.csv"
+    df = pd.read_csv(csv_filepath)
+    df_copy = df
+    all_dishes = df['Dish ID'].tolist()
+    for dish_id in all_dishes:
+        if dish_id not in files_no_extension:
+            df_copy = df_copy.drop(df_copy[df_copy['Dish ID']==dish_id].index)
+    df_copy.to_csv('SingleDishDatasetFixed.csv', index=False)
+
+
+
+
+
+
 
 
 

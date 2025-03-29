@@ -60,6 +60,34 @@ def preprocess_rgbd(image_path, target_size=(224, 224)) -> torch.Tensor:
     depth_tensor = depth_transform(depth_image)
     return depth_tensor
 
+def center_crop_image(image_path, output_path=None):
+    # Open the image
+    img = Image.open(image_path)
+
+    # Original image dimensions
+    width, height = img.size
+
+    # Target aspect ratio
+    aspect_ratio = width / height
+    target_height = 320
+    target_width = int(target_height * aspect_ratio)
+
+    # Resize to target size
+    resized_img = img.resize((target_width, target_height), Image.LANCZOS)
+
+    # crop
+    left = target_width - target_height
+    top = 0
+    right = target_width
+    bottom = target_height
+    cropped_img = resized_img.crop((left, top, right, bottom))
+
+    # Save if output path is provided
+    if output_path:
+        resized_img.save(output_path)
+
+    return cropped_img
+
 def get_glycemic_load(dish_id):
     ingredients_metadata_df = pd.read_csv(INGREDIENTS_METADATA_FILEPATH)
     total_gl = ingredients_metadata_df.groupby("Dish ID").get_group(dish_id)['Glycemic Load'].sum()
