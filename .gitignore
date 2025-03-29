@@ -1,0 +1,8 @@
+/PortionsEstimation/src/wandb/
+/PortionsEstimation/src/temp_wandb/
+/PortionsEstimation/src/models/saved/
+/PortionsEstimation/src/data/ingredients/
+/PortionsEstimation/src/data/processed/
+/PortionsEstimation/src/data/raw/
+/Portions Estimation/
+*.xml
