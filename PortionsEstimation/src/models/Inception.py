@@ -1,19 +1,15 @@
-from tensorflow.python.ops import nn
 import torchvision.models as models
 import torch.nn as nn
 
 class Inception(nn.Module):
-    def __init__(self, type: int, num_classes: int, is_pretrained: bool):
+    def __init__(self, type: int, num_classes: int):
         super(Inception, self).__init__()
 
         inception_models = {
-            3: models.inception_v3
+            3: models.inception_v3(pretrained=True)
         }
 
-        if is_pretrained:
-            weights = 'imagenet'
-
-        self.inception = inception_models[type](weights=weights)
+        self.inception = inception_models[type]
         self.inception.aux_logits = False
 
         in_features = self.inception.fc.in_features
