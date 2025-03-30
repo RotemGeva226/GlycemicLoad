@@ -12,21 +12,12 @@ def save_model(model, model_path, epoch, optimizer, loss):
     except Exception as e:
         print(f'An error occurred while saving the model: {e}')
 
-def load_model(model_path, model_class, optimizer_class=None, model_args: dict=None, optimizer_args: dict=None, mode='continue_training'):
+def load_model(model_path, model_class, model_args: dict=None):
     try:
         model = model_class(**model_args)
-        model.to(torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
-        checkpoint = torch.load(model_path, weights_only=True)
+        checkpoint = torch.load(model_path)
         model.load_state_dict(checkpoint['model_state_dict'])
-        if mode == 'continue_training':
-            optimizer = optimizer_class(model.parameters(), **optimizer_args)
-            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-            epoch = checkpoint['epoch']
-            loss = checkpoint['loss']
-            print('Model loaded successfully.')
-            return model, optimizer, epoch, loss
-        else:
-            return model
+        return model
     except Exception as e:
         print('An error occurred while loading the model:', e)
 
