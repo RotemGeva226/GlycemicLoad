@@ -17,7 +17,7 @@ class ResNet(nn.Module):
         }
 
         self.resnet = resnet_models[num_layers]
-        self.resnet.conv1 = nn.Conv2d(input_channels, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        self.resnet.conv1 = nn.Conv2d(input_channels, 64, kernel_size=3, stride=2, padding=3, bias=False)
         self.resnet.fc = nn.Linear(self.resnet.fc.in_features, out_features=num_classes)
 
         @abstractmethod
