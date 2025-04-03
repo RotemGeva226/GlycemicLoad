@@ -8,8 +8,8 @@ from tqdm import tqdm
 from sklearn.metrics import f1_score, roc_auc_score, confusion_matrix, ConfusionMatrixDisplay, mean_squared_error, \
     mean_absolute_error, r2_score
 from utils import save_model
-from data import MealDataset as MealDataset
-from models.Unet import UNet
+from data.MealDataset import MealDataset
+from models.Inception import Inception
 
 def train_classification(csv_file, model, experiment_name, batch_size, num_epochs, learning_rate, weight_decay):
     """
@@ -32,7 +32,7 @@ def train_classification(csv_file, model, experiment_name, batch_size, num_epoch
             "epochs": num_epochs,
             "learning_rate": learning_rate,
             "weight_decay": weight_decay,
-            "dataset": csv_file
+            "dataset": csv_file,
         }
     )
 
@@ -83,15 +83,13 @@ def train_classification(csv_file, model, experiment_name, batch_size, num_epoch
             loss.backward()
             optimizer.step()
 
-            if train_batches % 100 == 0 and torch.cuda.is_available():
-                if torch.cuda.memory_allocated() > 0.8 * torch.cuda.get_device_properties(0).total_memory:
-                    torch.cuda.synchronize()
-                    torch.cuda.empty_cache()
-
-        if train_batches % 100 == 0 and torch.cuda.is_available():
-            if torch.cuda.memory_allocated() > 0.8 * torch.cuda.get_device_properties(0).total_memory:
+            if train_batches % 10 == 0 and torch.cuda.is_available():
                 torch.cuda.synchronize()
                 torch.cuda.empty_cache()
+
+        if train_batches % 10 == 0 and torch.cuda.is_available():
+            torch.cuda.synchronize()
+            torch.cuda.empty_cache()
 
         avg_train_loss = train_loss / train_batches
 
@@ -534,8 +532,11 @@ def train_regression(model, experiment_name, batch_size, num_epochs, learning_ra
     model.to(device)
     csv_file = r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\PortionsEstimation\src\data\processed\processed_single_ingr_portions_regression\processed_single_ingr_portions_regression.csv"
 
+    # Prepare dataset
+    dataset = MealDataset(csv_file)
+
     # Initialize wandb
-    wandb.init(project="single-ingr-portions-regression", name=experiment_name, config={
+    wandb.init(project="single-ingr-portions-regression-final", name=experiment_name, config={
         "learning_rate": learning_rate,
         "weight_decay": weight_decay,
         "batch_size": batch_size,
@@ -545,17 +546,24 @@ def train_regression(model, experiment_name, batch_size, num_epochs, learning_ra
         "trend_window": trend_window,
         "trend_threshold": trend_threshold,
         "architecture": model.__class__.__name__,
-        "device": device
+        "device": device,
+        "augmentations": dataset.augmentation_used
     })
 
-    # Log model architecture
-    wandb.watch(model, log="all")
+    # Prepare data loaders
+    train_loader, val_loader, test_loader = dataset.get_regression_loader(batch_size=batch_size)
 
-    # Prepare data
-    train_loader, val_loader, test_loader = MealDataset.get_regression_loader(dataset_class=MealDataset,
-                                                                            batch_size=batch_size,
-                                                                            dataset_args={"csv_file": csv_file})
+    # Log model architecture
+    wandb.watch(model, log="all", log_freq=100)
+
     torch.save(test_loader, f"models/saved/single_ingr_portions_regression/tl-{experiment_name}.pt")
+    test_loader_artifact = wandb.Artifact(
+        name=f"test-loader-{experiment_name}",
+        type="dataset",
+        description="Test dataset loader for evaluation"
+    )
+    test_loader_artifact.add_file(f"models/saved/single_ingr_portions_regression/tl-{experiment_name}.pt")
+    wandb.log_artifact(test_loader_artifact)
 
     # Loss and optimizer
     criterion = nn.MSELoss()  # use MSELoss for regression
@@ -582,7 +590,7 @@ def train_regression(model, experiment_name, batch_size, num_epochs, learning_ra
         steps = 0
         train_batches = 0
 
-        for tensor, mass in train_loader:
+        for tensor, mass in tqdm(train_loader, desc="Batches"):
             tensor = tensor.float().to(device)
             mass = mass.float().to(device)
 
@@ -600,8 +608,8 @@ def train_regression(model, experiment_name, batch_size, num_epochs, learning_ra
             loss.backward()
             optimizer.step()
 
-            if train_batches % 40 == 0 and torch.cuda.is_available():
-                if torch.cuda.memory_allocated() > 0.8 * torch.cuda.get_device_properties(0).total_memory:
+            if train_batches % 10 == 0 and torch.cuda.is_available():
+                if torch.cuda.memory_allocated() > 0.3 * torch.cuda.get_device_properties(0).total_memory:
                     torch.cuda.synchronize()
                     torch.cuda.empty_cache()
 
@@ -619,7 +627,7 @@ def train_regression(model, experiment_name, batch_size, num_epochs, learning_ra
         all_targets = []
 
         with torch.no_grad():
-            for tensor, mass in val_loader:
+            for tensor, mass in tqdm(val_loader, desc="Val Batches"):
                 tensor = tensor.float().to(device)
                 mass = mass.float().to(device)
 
@@ -632,6 +640,7 @@ def train_regression(model, experiment_name, batch_size, num_epochs, learning_ra
                 all_targets.extend(mass.cpu().numpy().flatten())
 
         val_epoch_loss = val_loss / val_steps
+        val_losses.append(val_epoch_loss)
 
         # Trend detection for early stopping
         if len(val_losses) >= trend_window:
@@ -666,28 +675,31 @@ def train_regression(model, experiment_name, batch_size, num_epochs, learning_ra
         # Get current learning rate
         current_lr = optimizer.param_groups[0]['lr']
 
+        if current_lr < 0.0000001:
+            print(f"Stopping training: Learning rate {current_lr} is below {0.0000001}")
+            break
+
         # Print status
         print(
             f"Epoch [{epoch + 1}/{num_epochs}], Loss: {epoch_loss:.4f}, Val Loss: {val_epoch_loss:.4f}, RMSE: {rmse:.4f}, R²: {r2:.4f}, LR: {current_lr:.6f}")
 
         # Log to wandb - basic metrics
         wandb.log({
-            "epoch": epoch,
             "train_loss": epoch_loss,
             "val_loss": val_epoch_loss,
             "val_mse": mse,
             "val_rmse": rmse,
             "val_mae": mae,
             "val_r2": r2,
-            "learning_rate": current_lr
-        })
+            "learning_rate": current_lr,
+        }, step=epoch)
 
         # Log distribution plots
         wandb.log({
             "prediction_distribution": wandb.Histogram(all_predictions),
             "target_distribution": wandb.Histogram(all_targets),
             "error_distribution": wandb.Histogram(all_predictions - all_targets)
-        })
+        }, step=epoch)
 
         # Log scatter plot
         wandb.log({
@@ -698,7 +710,7 @@ def train_regression(model, experiment_name, batch_size, num_epochs, learning_ra
                 y="Predicted",
                 title="Predicted vs. Actual Mass"
             )
-        })
+        }, step=epoch)
 
         # Save best model by validation loss
         if val_epoch_loss < best_val_loss:
@@ -731,5 +743,7 @@ def train_regression(model, experiment_name, batch_size, num_epochs, learning_ra
 
     return model
 if __name__ == "__main__":
-    model = UNet(in_channels=3, out_channels=1)
-    train_regression(model=model, experiment_name="Unet", batch_size=32,num_epochs=300, learning_rate=0.0001,weight_decay=0.001)
+    # model = EfficientNet(3, 3, 1)
+    model = Inception(3, 1, True)
+    # limit_gpu_memory(0.9)
+    train_regression(model=model, experiment_name="Inception-V3-FrozeLayers", batch_size=16,num_epochs=200, learning_rate=0.00005,weight_decay=0.005)

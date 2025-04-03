@@ -61,10 +61,7 @@ def preprocess_rgbd(image_path, target_size=(224, 224)) -> torch.Tensor:
     return depth_tensor
 
 def center_crop_image(image_path, output_path=None):
-    # Open the image
     img = Image.open(image_path)
-
-    # Original image dimensions
     width, height = img.size
 
     # Target aspect ratio
@@ -72,17 +69,13 @@ def center_crop_image(image_path, output_path=None):
     target_height = 320
     target_width = int(target_height * aspect_ratio)
 
-    # Resize to target size
     resized_img = img.resize((target_width, target_height), Image.LANCZOS)
-
-    # crop
     left = target_width - target_height
     top = 0
     right = target_width
     bottom = target_height
     cropped_img = resized_img.crop((left, top, right, bottom))
 
-    # Save if output path is provided
     if output_path:
         resized_img.save(output_path)
 
@@ -271,11 +264,11 @@ def visualize_preprocessed_image(image_tensor_path):
 def get_augmentations():
     return T.Compose([
         T.RandomHorizontalFlip(p=0.5),
-        T.RandomRotation(degrees=10),
-        T.ColorJitter(brightness=0.25, contrast=0.25, saturation=0.25, hue=0.15),
+        T.RandomRotation(degrees=(-180,180)),
+        T.ColorJitter(brightness=0.25, contrast=0.15, saturation=0.25, hue=0.15),
         T.RandomResizedCrop(size=(224, 224), scale=(0.9, 1.0), ratio=(0.95, 1.05)),
-        T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         T.ToTensor(),
+        T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
 
 
@@ -310,7 +303,4 @@ if __name__ == "__main__":
     # target_folder_path = r"C:\Users\rotem.geva\PycharmProjects\GlycemicLoad\Portions Estimation\data\single_ingredient_images"
     # preprocess_dataset_local_images(csv_path)
     image_path = r"C:\Users\rotem.geva\Desktop\rgb.png"
-    transform = T.CenterCrop(224)
-    image = Image.open(image_path)
-    cropped_image = transform(image)
-    cropped_image.show()
+    display_augmentation(image_path)

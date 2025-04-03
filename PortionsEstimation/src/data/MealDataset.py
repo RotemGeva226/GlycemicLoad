@@ -17,19 +17,23 @@ class MealDataset(Dataset):
 
         self.train_transform = T.Compose([
             T.RandomHorizontalFlip(p=0.5),
-            T.RandomRotation(degrees=10),
-            T.ColorJitter(brightness=0.25, contrast=0.25, saturation=0.25, hue=0.15),
-            T.Resize((224,224)),
+            T.RandomRotation(degrees=[-180, 180]),
+            T.ColorJitter(brightness=(0.5,1.5), contrast=(0.5,1.5), saturation=(0.5,1.5), hue=0.15),
+            T.Resize((299,299)),
             T.ToTensor(),
             T.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD)
         ])
 
         self.eval_transform = T.Compose([
-            T.Resize((224,224)),
+            T.Resize((299,299)),
             T.ToTensor(),
             T.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD)
         ])
 
+        self.augmentation_used = {
+            "train_augmentation": str(self.train_transform),
+            "eval_augmentation": str(self.eval_transform)
+        }
         self.transform = self.train_transform if train_mode else self.eval_transform
 
     def __len__(self):
@@ -44,32 +48,31 @@ class MealDataset(Dataset):
         image = self.transform(image)
         return image, target_value
 
+    def get_regression_loader(self, batch_size=32, val_size=0.2, test_size=0.2):
+        # dataset_args['train_mode'] = True
+        # dataset = MealDataset(**dataset_args)
 
-def get_regression_loader(dataset_class, dataset_args=None, batch_size=32, val_size=0.2, test_size=0.2):
-    dataset_args['train_mode'] = True
-    dataset = dataset_class(**dataset_args)
+        # Split into different sets
+        total_size = len(self)
+        train_size = int((1 - val_size - test_size) * total_size)
+        val_size = int(val_size * total_size)
+        test_size = total_size - train_size - val_size  # The remaining data for testing
 
-    # Split into different sets
-    total_size = len(dataset)
-    train_size = int((1 - val_size - test_size) * total_size)
-    val_size = int(val_size * total_size)
-    test_size = total_size - train_size - val_size  # The remaining data for testing
+        # Perform the split
+        generator = torch.Generator().manual_seed(42)
+        train_dataset, val_dataset, test_dataset = random_split(self,
+                                                                [train_size, val_size, test_size],
+                                                                generator=generator)
 
-    # Perform the split
-    generator = torch.Generator().manual_seed(42)
-    train_dataset, val_dataset, test_dataset = random_split(dataset,
-                                                            [train_size, val_size, test_size],
-                                                            generator=generator)
-
-    val_dataset.dataset.train_mode = False
-    test_dataset.dataset.train_mode = False
-    # Create DataLoaders
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size,
-                                               num_workers=2, pin_memory=True)
-    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size,
-                                             num_workers=2, pin_memory=True, shuffle=False)
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-    return train_loader, val_loader, test_loader
+        val_dataset.dataset.train_mode = False
+        test_dataset.dataset.train_mode = False
+        # Create DataLoaders
+        train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size,
+                                                   num_workers=2, pin_memory=True)
+        val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size,
+                                                 num_workers=2, pin_memory=True, shuffle=False)
+        test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+        return train_loader, val_loader, test_loader
 
 def get_classification_loader(dataset_class, dataset_args=None, batch_size=32, val_size=0.2, test_size=0.2):
     dataset = dataset_class(**dataset_args)
