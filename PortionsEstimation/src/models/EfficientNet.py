@@ -2,7 +2,7 @@ import torchvision.models as models
 import torch.nn as nn
 
 class EfficientNet(nn.Module):
-    def __init__(self, type: int, input_channels: int, num_classes: int):
+    def __init__(self, type: int, input_channels: int, num_classes: int,  freeze_layers=False):
         super(EfficientNet, self).__init__()
 
         efficientnet_models = {
@@ -15,6 +15,15 @@ class EfficientNet(nn.Module):
                                                      kernel_size=(3, 3),
                                                      stride=(2, 2), padding=(1, 1),
                                                      bias=False)
+
+        if freeze_layers:
+            for name, param in self.efficientnet.features.named_parameters():
+                param.requires_grad = False
+
+        # Replace classifier
+        in_features = self.efficientnet.classifier[1].in_features
+        self.efficientnet.classifier[1] = nn.Linear(in_features, num_classes)
+
         in_features = self.efficientnet.classifier[1].in_features
         self.efficientnet.classifier[1] = nn.Linear(in_features, num_classes)
 
