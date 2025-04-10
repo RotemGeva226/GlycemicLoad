@@ -9,7 +9,6 @@ from sklearn.metrics import f1_score, roc_auc_score, confusion_matrix, Confusion
     mean_absolute_error, r2_score
 from utils import save_model
 from data.MealDataset import MealDataset
-from models.Inception import Inception
 
 def train_classification(csv_file, model, experiment_name, batch_size, num_epochs, learning_rate, weight_decay):
     """
@@ -556,7 +555,7 @@ def train_regression(model, experiment_name, batch_size, num_epochs, learning_ra
     # Log model architecture
     wandb.watch(model, log="all", log_freq=100)
 
-    torch.save(test_loader, f"models/saved/single_ingr_portions_regression/tl-{experiment_name}.pt")
+    torch.save(test_loader.dataset, f"models/saved/single_ingr_portions_regression/tl-{experiment_name}.pt")
     test_loader_artifact = wandb.Artifact(
         name=f"test-loader-{experiment_name}",
         type="dataset",
