@@ -32,7 +32,7 @@ def invoke(image_data: str, prompt: str) -> str:
     )
 
     response = llm.invoke([message])
-    return response
+    return response.content
 
 
 def encode_image_to_base64(image_path: str) -> str:
@@ -42,7 +42,7 @@ def encode_image_to_base64(image_path: str) -> str:
 
 def extract_ingredients(image_path: str) -> str:
     base64_image = encode_image_to_base64(image_path)
-    prompt = f"""List the food items you see in the image. For example: ['Apple', 'Melon'].
+    prompt = f"""List the food items you see in the image. For example: Apple, Strawberries.
             Do not describe the surroundings and do not describe the food items you see."""
     return invoke(base64_image, prompt)
 
