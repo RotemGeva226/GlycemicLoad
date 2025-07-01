@@ -78,14 +78,6 @@ gl_value = gle.compute_gl(food='apple_pie', portion_g=150)
 print(f'Estimated GL: {gl_value:.2f}')
 ```
 
-## 🧪 Jupyter Notebooks
-
-Explore interactive examples:
-
-* `FoodClassification/notebook.ipynb`: classify food items from sample images
-* `GLEstimator/notebook.ipynb`: compute glycemic loads across meals
-* `PortionsEstimation/notebook.ipynb`: visualize portion size estimates
-
 ## 📦 Requirements
 
 Python 3.7+, plus these core dependencies:
