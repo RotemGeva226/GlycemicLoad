@@ -1,6 +1,6 @@
 # Portions Estimation
 ## Overview
-The PortionsEstimation directory includes code for training and evaluating various deep learning models used for food portion estimation.
+The **PortionsEstimation** directory includes code for training and evaluating various deep learning models used for food portion estimation.
 
 ## Directory Status
 - `/src/models`: Contains model definitions, including EfficientNet, Inception, ResNet, and UNet architectures.
