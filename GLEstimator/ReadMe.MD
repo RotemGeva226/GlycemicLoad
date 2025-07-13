@@ -1,5 +1,5 @@
 # GLEstimator
-The GLEstimator module is a core component in the GlycemicLoad pipeline. It integrates ingredient recognition results with portion estimations to calculate the Glycemic Load (GL) of a meal.
+The **GLEstimator** module is a core component in the GlycemicLoad pipeline. It integrates ingredient recognition results with portion estimations to calculate the Glycemic Load (GL) of a meal.
 
 ## Purpose
 This directory wraps up the final step:
