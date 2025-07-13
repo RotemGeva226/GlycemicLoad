@@ -36,16 +36,6 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## 📥 Data Setup
-
-Download the Nutrition5k dataset using the provided script:
-
-```sh
-python DownloadFilesFromDataset_Nutrition5k.py --output-dir data/
-```
-
-This retrieves images, nutrition metadata, and food labels automatically.
-
 ## ⚙️ Usage
 
 ### 1. Food Classification
