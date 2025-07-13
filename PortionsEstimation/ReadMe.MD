@@ -6,4 +6,4 @@ The PortionsEstimation directory includes code for training and evaluating vario
 - `PortionsEstimation/src/models`: Contains model definitions, including EfficientNet, Inception, ResNet, and UNet architectures.
 - `PortionsEstimation/src/training`: Includes all training and evaluation routines for the models.
 - `PortionsEstimation/src/data`: Provides dataset setup and preprocessing logic.
-- `PortionsEstimation/notebooks`: Includes notebooks for visualizations, data preprocessing etc. 
+- `PortionsEstimation/notebooks`: Includes notebooks that were used for visualizations, data preprocessing and project log tracking. 
