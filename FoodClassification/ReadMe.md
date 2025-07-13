@@ -1,6 +1,6 @@
 # Food Classification
 ## Overview
-The **Food Classification** project focuses on classifying various types of food using machine learning techniques. This project leverages advanced algorithms and pre-trained models to accurately identify and categorize food items based on images or other input types.
+The **Food Classification** This directory contains code that leverages LLM pre-trained models to accurately identify and categorize food items based on images.
 
 ## Directory Status
 - `food_classification`: This file includes all the functions utilized for food classification.
