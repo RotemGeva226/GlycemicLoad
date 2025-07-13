@@ -3,8 +3,6 @@
 The **Food Classification** directory contains code that leverages LLM pre-trained models to accurately identify and categorize food items based on images.
 
 ## Directory Status
-- `food_classification`: This file includes all the functions utilized for food classification.
-**Note:** It also contains functions related to portion estimation, which were initially tested using LLM.
 - `ChatGPT`: Sets up the ChatGPT client and includes functions specific to ChatGPT prompt handling.
 - `Claude`: Sets up the Claude client and includes functions specific to Claude prompt handling.
 - `Gemini`: Sets up the Gemini client and includes functions specific to Gemini prompt handling.
