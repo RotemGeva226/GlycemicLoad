@@ -9,10 +9,10 @@ This directory wraps up the final step:
 4. Computes Glycemic Load using the formula: GL = [GI × Available Carbs (g)]/100
 
 ## Directory Status
-- `GLEstimator/chains`: Contains Langchain full flow.
-- `GLEstimator/llm`: Includes all API for interacting with Claude.
-- `GLEstimator/model`: Provides vision model setup to predict portions in grams.
-- `GLEstimator/utils`: Handles local databse API.
+- `chains`: Contains Langchain full flow.
+- `llm`: Includes all API for interacting with Claude.
+- `model`: Provides vision model setup to predict portions in grams.
+- `utils`: Handles local databse API.
 
  
 
